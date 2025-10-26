@@ -464,12 +464,12 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
                   />
                   
                   {/* CTA Card */}
-                  <div className="relative bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-5 shadow-xl">
-                    <div className="text-center mb-3">
-                      <p className="text-white mb-1">
+                  <div className="relative bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
+                    <div className="text-center mb-4">
+                      <p className="text-slate-700 mb-1">
                         Ready to begin your journey?
                       </p>
-                      <p className="text-indigo-100 text-sm">
+                      <p className="text-slate-500 text-sm">
                         Let's visualize your path to accomplishment
                       </p>
                     </div>
@@ -481,7 +481,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
                       <Button
                         onClick={handleBuildQuestMap}
                         size="lg"
-                        className="w-full bg-white text-indigo-600 hover:bg-indigo-50 py-6 shadow-lg"
+                        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 py-6 shadow-md"
                       >
                         Build My Quest Map
                       </Button>
