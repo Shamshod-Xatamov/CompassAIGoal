@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
+import { ScrollArea } from './ui/scroll-area';
 import { Compass, Sparkles, Send } from 'lucide-react';
 
 interface OnboardingScreenProps {
@@ -13,15 +14,43 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
   const [step, setStep] = useState<'welcome' | 'conversation' | 'summary'>('welcome');
   const [messages, setMessages] = useState<Array<{ sender: 'ai' | 'user'; text: string }>>([]);
   const [inputValue, setInputValue] = useState('');
-  const [conversationStep, setConversationStep] = useState(0);
+  const [isTyping, setIsTyping] = useState(false);
+  const [messageCount, setMessageCount] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, isTyping]);
 
   const startConversation = () => {
     setStep('conversation');
     setTimeout(() => {
       setMessages([
-        { sender: 'ai', text: "I'm excited to help you find your direction. Let's start simple: What would you like to accomplish? What's been on your mind?" }
+        { sender: 'ai', text: "Hi there! 👋 I'm your Compass guide. I'm here to help you discover your goals and create your personal quest map. What brings you here today?" }
       ]);
     }, 500);
+  };
+
+  const getAIResponse = (userMessage: string, count: number): string => {
+    const responses = [
+      "That's interesting! Tell me more about what drives you.",
+      "I love that! What would achieving this mean to you?",
+      "That's wonderful! How do you envision your journey?",
+      "Great insight! What's the first step you'd like to take?",
+      "I'm getting a clearer picture now. How do you want to measure your progress?",
+      "Fantastic! I think we have enough to create something amazing. Ready to build your quest map?"
+    ];
+    
+    // Return appropriate response based on message count
+    if (count >= 5) {
+      return "This is amazing! I have a great sense of your direction now. Let's turn this into your personalized Quest Map! 🎯";
+    }
+    
+    return responses[count] || responses[responses.length - 1];
   };
 
   const handleSendMessage = () => {
@@ -30,29 +59,32 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
     const userMessage = inputValue;
     setMessages(prev => [...prev, { sender: 'user', text: userMessage }]);
     setInputValue('');
+    setIsTyping(true);
 
-    // AI responses based on the 5 Whys conversation flow
-    const aiResponses = [
-      "That sounds meaningful. Can you tell me why that's important to you?",
-      "I understand. If you dig a little deeper, why does that matter?",
-      "Interesting. And why is achieving that so important?",
-      "That's really insightful. One more question - why does that feeling matter to you?",
-      "Beautiful. I think I'm beginning to see your North Star - the deeper purpose guiding you. Let me capture what I'm hearing..."
-    ];
-
+    // Simulate AI thinking
     setTimeout(() => {
-      if (conversationStep < aiResponses.length) {
-        setMessages(prev => [...prev, { sender: 'ai', text: aiResponses[conversationStep] }]);
-        setConversationStep(conversationStep + 1);
-
-        // After the last question, show summary
-        if (conversationStep === aiResponses.length - 1) {
-          setTimeout(() => {
-            setStep('summary');
-          }, 2000);
-        }
+      setIsTyping(false);
+      const newCount = messageCount + 1;
+      setMessageCount(newCount);
+      
+      const aiResponse = getAIResponse(userMessage, newCount);
+      setMessages(prev => [...prev, { sender: 'ai', text: aiResponse }]);
+      
+      // Show completion button after 5+ exchanges
+      if (newCount >= 5) {
+        setTimeout(() => {
+          setMessages(prev => [...prev, { 
+            sender: 'ai', 
+            text: "Click below when you're ready to see your Quest Map! 🗺️✨" 
+          }]);
+        }, 1000);
       }
-    }, 1000);
+      
+      // Auto-focus input after AI responds
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    }, 800 + Math.random() * 400);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -60,6 +92,10 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
       e.preventDefault();
       handleSendMessage();
     }
+  };
+
+  const handleShowSummary = () => {
+    setStep('summary');
   };
 
   const handleBuildQuestMap = () => {
@@ -211,10 +247,17 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
 
         {/* Ambient Glow */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
+        
+        {/* Water-like blend effect - right edge */}
+        <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-r from-transparent via-indigo-600/10 to-indigo-400/20 pointer-events-none blur-2xl" />
+        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-r from-transparent to-purple-500/15 pointer-events-none blur-xl" />
       </motion.div>
 
       {/* Right Panel - Interactive Onboarding */}
       <div className="w-3/5 bg-gradient-to-br from-slate-50 to-white flex items-center justify-center p-16 relative overflow-y-auto">
+        {/* Water-like blend effect - left edge */}
+        <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-l from-transparent via-indigo-50 to-indigo-100/30 pointer-events-none blur-2xl" />
+        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-l from-transparent to-purple-50/50 pointer-events-none blur-xl" />
         {/* Subtle Background Pattern */}
         <div className="absolute inset-0 opacity-[0.02]" style={{
           backgroundImage: 'radial-gradient(circle at 2px 2px, #6366f1 1px, transparent 0)',
@@ -267,59 +310,132 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="w-full max-w-2xl h-full flex flex-col relative z-10"
+            className="w-full max-w-3xl h-full flex flex-col relative z-10 py-8"
           >
-            {/* Progress Indicator */}
+            {/* Chat Header */}
             <motion.div 
-              className="mb-6"
+              className="mb-6 text-center"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <div className="flex items-center gap-2 mb-2">
-                {[...Array(5)].map((_, i) => (
+              <div className="inline-flex items-center gap-3 px-6 py-3 bg-white/80 backdrop-blur-sm rounded-full shadow-lg border border-indigo-100">
+                <div className="relative">
+                  <motion.div 
+                    className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
+                  >
+                    <Compass className="w-5 h-5 text-white" strokeWidth={2} />
+                  </motion.div>
                   <motion.div
-                    key={i}
-                    className={`h-1.5 flex-1 rounded-full ${
-                      i < conversationStep ? 'bg-indigo-600' : 'bg-slate-200'
-                    }`}
-                    initial={{ scaleX: 0 }}
-                    animate={{ scaleX: i < conversationStep ? 1 : 1 }}
-                    transition={{ delay: i * 0.1 }}
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white"
                   />
-                ))}
+                </div>
+                <div className="text-left">
+                  <p className="text-sm text-slate-800">Compass AI</p>
+                  <p className="text-xs text-slate-500">Online</p>
+                </div>
               </div>
-              <p className="text-xs text-slate-500 text-center">
-                Question {Math.min(conversationStep + 1, 5)} of 5 — The 5 Whys Journey
-              </p>
             </motion.div>
 
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto space-y-6 mb-6 pr-4">
+            {/* Chat Messages - Scrollable Area */}
+            <div 
+              ref={scrollRef}
+              className="flex-1 overflow-y-auto space-y-4 mb-6 px-2"
+              style={{ scrollBehavior: 'smooth' }}
+            >
               {messages.map((msg, idx) => (
                 <motion.div
                   key={idx}
-                  initial={{ opacity: 0, x: msg.sender === 'user' ? 20 : -20, y: 10 }}
-                  animate={{ opacity: 1, x: 0, y: 0 }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
                   transition={{ 
                     delay: 0.1,
                     type: 'spring',
-                    stiffness: 200,
-                    damping: 20
+                    stiffness: 150,
+                    damping: 15
                   }}
-                  className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
+                  {msg.sender === 'ai' && (
+                    <motion.div 
+                      className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center flex-shrink-0 shadow-md"
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
+                    >
+                      <Compass className="w-4 h-4 text-white" strokeWidth={2.5} />
+                    </motion.div>
+                  )}
                   <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    className={`max-w-md px-6 py-4 rounded-3xl shadow-lg ${msg.sender === 'user'
-                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
-                        : 'bg-white text-slate-800 border border-slate-200'
-                      }`}
+                    whileHover={{ scale: 1.01 }}
+                    className={`max-w-lg px-5 py-3.5 rounded-2xl shadow-md ${
+                      msg.sender === 'user'
+                        ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-tr-sm'
+                        : 'bg-white text-slate-800 border border-slate-100 rounded-tl-sm'
+                    }`}
                   >
-                    {msg.text}
+                    <p className="leading-relaxed">{msg.text}</p>
                   </motion.div>
+                  {msg.sender === 'user' && (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center flex-shrink-0 shadow-md text-white text-sm">
+                      You
+                    </div>
+                  )}
                 </motion.div>
               ))}
+              
+              {/* Typing Indicator */}
+              {isTyping && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex gap-3 justify-start"
+                >
+                  <motion.div 
+                    className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center flex-shrink-0 shadow-md"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
+                  >
+                    <Compass className="w-4 h-4 text-white" strokeWidth={2.5} />
+                  </motion.div>
+                  <div className="px-5 py-3.5 rounded-2xl rounded-tl-sm bg-white border border-slate-100 shadow-md">
+                    <div className="flex gap-1.5">
+                      {[0, 1, 2].map((i) => (
+                        <motion.div
+                          key={i}
+                          animate={{ y: [0, -8, 0] }}
+                          transition={{
+                            duration: 0.6,
+                            repeat: Infinity,
+                            delay: i * 0.15
+                          }}
+                          className="w-2 h-2 bg-indigo-400 rounded-full"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </div>
+
+            {/* Complete Button - Shows after enough messages */}
+            {messageCount >= 5 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4"
+              >
+                <Button
+                  onClick={handleShowSummary}
+                  className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 py-6 shadow-lg text-white"
+                >
+                  <Sparkles className="w-5 h-5 mr-2" />
+                  Continue to Summary
+                </Button>
+              </motion.div>
+            )}
 
             {/* Input Area */}
             <motion.div 
@@ -330,20 +446,22 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
             >
               <div className="flex-1 relative">
                 <Input
+                  ref={inputRef}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Share your thoughts..."
-                  className="w-full px-6 py-6 text-base border-2 border-slate-200 focus:border-indigo-400 rounded-2xl shadow-lg"
+                  placeholder="Type your message..."
+                  className="w-full px-5 py-6 text-base border-2 border-slate-200 focus:border-indigo-400 rounded-2xl shadow-md bg-white/80 backdrop-blur-sm"
                   autoFocus
+                  disabled={isTyping}
                 />
               </div>
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button
                   onClick={handleSendMessage}
                   size="lg"
-                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 px-6 shadow-lg"
-                  disabled={!inputValue.trim()}
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 px-7 py-6 shadow-lg"
+                  disabled={!inputValue.trim() || isTyping}
                 >
                   <Send className="w-5 h-5" />
                 </Button>
@@ -354,144 +472,194 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
 
         {step === 'summary' && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 200 }}
-            className="w-full max-w-3xl relative z-10 my-8"
+            transition={{ type: 'spring', stiffness: 150, damping: 20 }}
+            className="w-full max-w-4xl relative z-10"
           >
-            {/* Main Content Card */}
-            <Card className="p-10 shadow-2xl border-0 bg-white relative overflow-hidden">
-              {/* Radial Gradient Background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 opacity-60" />
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-gradient-to-br from-indigo-300/30 to-purple-300/30 rounded-full blur-3xl" />
+            <Card className="p-12 shadow-2xl border-0 bg-white/90 backdrop-blur-xl relative overflow-hidden">
+              {/* Animated Background Elements */}
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/80 via-purple-50/80 to-pink-50/80" />
+              <motion.div 
+                className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-gradient-to-br from-indigo-300/20 to-purple-300/20 rounded-full blur-3xl"
+                animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+                transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+              />
+              
+              {/* Floating Particles */}
+              {[...Array(8)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute w-1.5 h-1.5 bg-indigo-400 rounded-full"
+                  style={{
+                    left: `${20 + Math.random() * 60}%`,
+                    top: `${20 + Math.random() * 60}%`,
+                  }}
+                  animate={{
+                    y: [0, -20, 0],
+                    opacity: [0.2, 0.6, 0.2],
+                  }}
+                  transition={{
+                    duration: 3 + Math.random() * 2,
+                    repeat: Infinity,
+                    delay: Math.random() * 2,
+                  }}
+                />
+              ))}
               
               <div className="relative z-10">
-                {/* North Star Section */}
-                <div className="text-center mb-8">
+                {/* Header with Compass Icon */}
+                <div className="text-center mb-10">
                   <motion.div
-                    animate={{ 
-                      scale: [1, 1.1, 1],
-                      rotate: [0, 5, -5, 0]
-                    }}
+                    initial={{ scale: 0, rotate: -180 }}
+                    animate={{ scale: 1, rotate: 0 }}
                     transition={{ 
-                      duration: 3, 
-                      repeat: Infinity,
-                      repeatType: 'reverse'
+                      type: 'spring',
+                      stiffness: 200,
+                      damping: 15,
+                      delay: 0.2 
                     }}
-                    className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 mb-4 shadow-xl"
+                    className="inline-block mb-6"
                   >
-                    <Sparkles className="w-8 h-8 text-white" />
+                    <div className="relative">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 60, repeat: Infinity, ease: 'linear' }}
+                        className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow-2xl"
+                      >
+                        <Compass className="w-10 h-10 text-white" strokeWidth={2} />
+                      </motion.div>
+                      <motion.div
+                        animate={{ scale: [1, 1.3, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="absolute -inset-2 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-full blur-xl opacity-30"
+                      />
+                    </div>
                   </motion.div>
-                  <h3 className="text-2xl mb-3 text-slate-700">Your North Star</h3>
-                  <motion.p 
-                    className="text-3xl bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-6"
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.3, type: 'spring' }}
+                  
+                  <motion.h2 
+                    className="text-4xl mb-3 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
                   >
-                    To feel a sense of creative accomplishment
+                    Your Journey Begins
+                  </motion.h2>
+                  <motion.p 
+                    className="text-slate-600"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    Here's what we discovered together
                   </motion.p>
                 </div>
 
-                {/* Two Column Layout for Quests and Habits */}
-                <div className="grid grid-cols-2 gap-6 mb-8">
-                  <motion.div
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                  >
-                    <h4 className="mb-3 text-slate-600">Your Quests</h4>
-                    <div className="space-y-2">
-                      {['Launch Side Project', 'Learn Guitar', 'Health & Fitness'].map((quest, idx) => (
-                        <motion.div
-                          key={quest}
-                          initial={{ x: -20, opacity: 0 }}
-                          animate={{ x: 0, opacity: 1 }}
-                          transition={{ delay: 0.5 + idx * 0.1 }}
-                          className="p-3 bg-gradient-to-r from-white to-indigo-50 rounded-lg shadow-sm border border-indigo-100 text-sm"
-                        >
-                          {quest}
-                        </motion.div>
-                      ))}
-                    </div>
-                  </motion.div>
-
-                  <motion.div
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.6 }}
-                  >
-                    <h4 className="mb-3 text-slate-600">Daily Habits</h4>
-                    <div className="space-y-2">
-                      {[
-                        'Creative session (30m)',
-                        'Guitar practice (20m)',
-                        'Evening reflection (10m)'
-                      ].map((habit, idx) => (
-                        <motion.div
-                          key={habit}
-                          initial={{ x: -20, opacity: 0 }}
-                          animate={{ x: 0, opacity: 1 }}
-                          transition={{ delay: 0.7 + idx * 0.1 }}
-                          className="p-3 bg-gradient-to-r from-white to-purple-50 rounded-lg shadow-sm border border-purple-100 text-sm"
-                        >
-                          {habit}
-                        </motion.div>
-                      ))}
-                    </div>
-                  </motion.div>
-                </div>
-
-                {/* Prominent CTA Section with Visual Cues */}
-                <motion.div
-                  initial={{ y: 30, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 1 }}
-                  className="relative"
+                {/* North Star Section */}
+                <motion.div 
+                  className="mb-10 text-center"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
                 >
-                  {/* Pulsing Glow Effect */}
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-100/50 border border-indigo-200/50 mb-4">
+                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                    <span className="text-sm text-indigo-700">Your North Star</span>
+                  </div>
+                  <motion.p 
+                    className="text-3xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent px-8"
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.6, type: 'spring' }}
+                  >
+                    "To feel a sense of creative accomplishment"
+                  </motion.p>
+                </motion.div>
+
+                {/* Quests Grid */}
+                <motion.div 
+                  className="mb-10"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                >
+                  <h3 className="text-center text-slate-700 mb-6">Your Quest Map</h3>
+                  <div className="grid grid-cols-3 gap-5">
+                    {[
+                      { name: 'Launch Side Project', icon: '🚀', color: 'from-blue-500 to-cyan-500' },
+                      { name: 'Learn Guitar', icon: '🎸', color: 'from-purple-500 to-pink-500' },
+                      { name: 'Health & Fitness', icon: '💪', color: 'from-emerald-500 to-teal-500' }
+                    ].map((quest, idx) => (
+                      <motion.div
+                        key={quest.name}
+                        initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ delay: 0.8 + idx * 0.1, type: 'spring' }}
+                        whileHover={{ scale: 1.05, y: -5 }}
+                        className="relative group"
+                      >
+                        <div className="p-6 bg-white rounded-2xl shadow-lg border border-slate-100 hover:shadow-xl transition-all">
+                          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${quest.color} flex items-center justify-center text-2xl mb-4 shadow-md`}>
+                            {quest.icon}
+                          </div>
+                          <p className="text-slate-800">{quest.name}</p>
+                          <div className="mt-3 flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                              <motion.div 
+                                className={`h-full bg-gradient-to-r ${quest.color}`}
+                                initial={{ width: 0 }}
+                                animate={{ width: '40%' }}
+                                transition={{ delay: 1 + idx * 0.1, duration: 0.8 }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+
+                {/* CTA Button */}
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.2 }}
+                  className="text-center"
+                >
                   <motion.div
                     animate={{
-                      opacity: [0.3, 0.6, 0.3],
-                      scale: [1, 1.05, 1],
+                      scale: [1, 1.02, 1],
                     }}
                     transition={{
                       duration: 2,
                       repeat: Infinity,
                       ease: "easeInOut"
                     }}
-                    className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur-xl"
-                  />
-                  
-                  {/* CTA Card */}
-                  <div className="relative bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
-                    <div className="text-center mb-4">
-                      <p className="text-slate-700 mb-1">
-                        Ready to begin your journey?
-                      </p>
-                      <p className="text-slate-500 text-sm">
-                        Let's visualize your path to accomplishment
-                      </p>
-                    </div>
-                    
-                    <motion.div
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                  >
+                    <Button
+                      onClick={handleBuildQuestMap}
+                      size="lg"
+                      className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 px-12 py-7 shadow-2xl shadow-indigo-500/30 text-lg"
                     >
-                      <Button
-                        onClick={handleBuildQuestMap}
-                        size="lg"
-                        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 py-6 shadow-md"
-                      >
-                        Build My Quest Map
-                      </Button>
-                    </motion.div>
-                  </div>
+                      <Compass className="w-6 h-6 mr-3" />
+                      Launch Quest Map
+                      <Sparkles className="w-5 h-5 ml-3" />
+                    </Button>
+                  </motion.div>
+                  <motion.p 
+                    className="text-sm text-slate-500 mt-4"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 1.4 }}
+                  >
+                    Your personalized journey awaits
+                  </motion.p>
                 </motion.div>
               </div>
             </Card>
           </motion.div>
         )}
+
       </div>
     </div>
   );

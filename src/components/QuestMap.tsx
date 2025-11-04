@@ -1,43 +1,218 @@
-import { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle2, Circle, MapPin, X, Calendar, Target, Trophy, Sparkles, Star, Flag } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence, Reorder } from 'motion/react';
+import { 
+  CheckCircle2, Circle, MapPin, X, Calendar, Target, Trophy, Sparkles, Star, Flag, 
+  Edit2, Trash2, Plus, GripVertical, Check, XCircle, MessageCircle
+} from 'lucide-react';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from './ui/accordion';
+
+interface Task {
+  id: string;
+  text: string;
+  completed: boolean;
+  priority: 'high' | 'medium' | 'low';
+}
+
+interface DayPlan {
+  [key: string]: Task[];
+}
 
 interface QuestMapProps {
   quest: any;
+  onAskAI?: (taskText: string, questName: string, dayOfWeek: string) => void;
 }
 
-export function QuestMap({ quest }: QuestMapProps) {
+export function QuestMap({ quest, onAskAI }: QuestMapProps) {
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [editingTask, setEditingTask] = useState<{ day: string; taskId: string } | null>(null);
+  const [editText, setEditText] = useState('');
+  const [currentDayAccordion, setCurrentDayAccordion] = useState<string[]>([]);
 
   // Generate weeks data (4 weeks per milestone)
   const totalWeeks = quest.milestones.length * 4;
   const currentWeek = Math.floor((quest.progress / 100) * totalWeeks);
+
+  // Initialize tasks state with priorities
+  const [weekTasks, setWeekTasks] = useState<{ [weekIndex: number]: DayPlan }>({});
 
   const weeks = Array.from({ length: totalWeeks }, (_, i) => {
     const weekNumber = i + 1;
     const milestoneIndex = Math.floor(i / 4);
     const isComplete = i < currentWeek;
     const isCurrent = i === currentWeek;
+    const weekPart = (i % 4) + 1;
+
+    // Initialize tasks for this week if not already done
+    if (!weekTasks[i]) {
+      const createTasks = (tasks: string[], startPriority: 'high' | 'medium' | 'low' = 'medium'): Task[] => {
+        return tasks.map((text, idx) => ({
+          id: `${i}-${text}-${idx}`,
+          text,
+          completed: isComplete,
+          priority: idx === 0 ? 'high' : startPriority
+        }));
+      };
+
+      weekTasks[i] = {
+        monday: createTasks([
+          `Start: ${quest.milestones[milestoneIndex]} (Part ${weekPart})`,
+          `Morning review and planning session`,
+          `Practice core habits (30 min)`
+        ]),
+        tuesday: createTasks([
+          `Deep work: ${quest.milestones[milestoneIndex]}`,
+          `Track progress and metrics`,
+          `Evening reflection (15 min)`
+        ]),
+        wednesday: createTasks([
+          `Continue ${quest.milestones[milestoneIndex]} work`,
+          `Mid-week checkpoint review`,
+          `Adjust approach if needed`
+        ]),
+        thursday: createTasks([
+          `Focus session: Key deliverable`,
+          `Practice related skills`,
+          `Review learnings so far`
+        ]),
+        friday: createTasks([
+          `Complete week's main objective`,
+          `Document insights and wins`,
+          `Prepare for next week`
+        ]),
+        saturday: createTasks([
+          `Light work or catch-up time`,
+          `Review weekly progress`,
+          `Optional: Explore related topics`
+        ]),
+        sunday: createTasks([
+          `Rest and recharge`,
+          `Weekly reflection ritual`,
+          `Set intentions for next week`
+        ])
+      };
+    }
 
     return {
       week: weekNumber,
       milestone: quest.milestones[milestoneIndex],
       isComplete,
       isCurrent,
-      tasks: [
-        `Work on ${quest.milestones[milestoneIndex]} - Part ${(i % 4) + 1}`,
-        `Review and iterate on progress`,
-        `Practice daily habits and routines`,
-        `Document learnings and insights`
-      ]
+      dailyPlan: weekTasks[i] || {}
     };
   });
+
+  // Auto-open current day when modal opens
+  useEffect(() => {
+    if (selectedWeek !== null && weeks[selectedWeek]?.isCurrent) {
+      const today = new Date().getDay();
+      const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      setCurrentDayAccordion([days[today]]);
+    } else {
+      setCurrentDayAccordion([]);
+    }
+  }, [selectedWeek]);
+
+  // Task management functions
+  const toggleTaskComplete = (weekIndex: number, day: string, taskId: string) => {
+    setWeekTasks(prev => ({
+      ...prev,
+      [weekIndex]: {
+        ...prev[weekIndex],
+        [day]: prev[weekIndex][day].map(task =>
+          task.id === taskId ? { ...task, completed: !task.completed } : task
+        )
+      }
+    }));
+  };
+
+  const startEditTask = (day: string, taskId: string, currentText: string) => {
+    setEditingTask({ day, taskId });
+    setEditText(currentText);
+  };
+
+  const saveEditTask = (weekIndex: number, day: string, taskId: string) => {
+    if (editText.trim()) {
+      setWeekTasks(prev => ({
+        ...prev,
+        [weekIndex]: {
+          ...prev[weekIndex],
+          [day]: prev[weekIndex][day].map(task =>
+            task.id === taskId ? { ...task, text: editText.trim() } : task
+          )
+        }
+      }));
+    }
+    setEditingTask(null);
+    setEditText('');
+  };
+
+  const deleteTask = (weekIndex: number, day: string, taskId: string) => {
+    setWeekTasks(prev => ({
+      ...prev,
+      [weekIndex]: {
+        ...prev[weekIndex],
+        [day]: prev[weekIndex][day].filter(task => task.id !== taskId)
+      }
+    }));
+  };
+
+  const addNewTask = (weekIndex: number, day: string) => {
+    const newTask: Task = {
+      id: `${weekIndex}-${day}-${Date.now()}`,
+      text: 'New task',
+      completed: false,
+      priority: 'medium'
+    };
+    setWeekTasks(prev => ({
+      ...prev,
+      [weekIndex]: {
+        ...prev[weekIndex],
+        [day]: [...prev[weekIndex][day], newTask]
+      }
+    }));
+    // Auto-start editing the new task
+    startEditTask(day, newTask.id, newTask.text);
+  };
+
+  const changePriority = (weekIndex: number, day: string, taskId: string) => {
+    setWeekTasks(prev => ({
+      ...prev,
+      [weekIndex]: {
+        ...prev[weekIndex],
+        [day]: prev[weekIndex][day].map(task => {
+          if (task.id === taskId) {
+            const priorities: Array<'high' | 'medium' | 'low'> = ['high', 'medium', 'low'];
+            const currentIndex = priorities.indexOf(task.priority);
+            const nextPriority = priorities[(currentIndex + 1) % 3];
+            return { ...task, priority: nextPriority };
+          }
+          return task;
+        })
+      }
+    }));
+  };
+
+  const reorderTasks = (weekIndex: number, day: string, newOrder: Task[]) => {
+    setWeekTasks(prev => ({
+      ...prev,
+      [weekIndex]: {
+        ...prev[weekIndex],
+        [day]: newOrder
+      }
+    }));
+  };
 
   // Dynamic height calculation - more compact with more weeks
   const baseHeight = 600;
@@ -105,6 +280,22 @@ export function QuestMap({ quest }: QuestMapProps) {
 
   const handleMouseUp = () => {
     setIsDragging(false);
+  };
+
+  const getPriorityColor = (priority: 'high' | 'medium' | 'low') => {
+    switch (priority) {
+      case 'high': return 'bg-red-100 text-red-700 border-red-200';
+      case 'medium': return 'bg-amber-100 text-amber-700 border-amber-200';
+      case 'low': return 'bg-slate-100 text-slate-600 border-slate-200';
+    }
+  };
+
+  const getPriorityIcon = (priority: 'high' | 'medium' | 'low') => {
+    switch (priority) {
+      case 'high': return '🔴';
+      case 'medium': return '🟡';
+      case 'low': return '⚪';
+    }
   };
 
   return (
@@ -620,31 +811,27 @@ export function QuestMap({ quest }: QuestMapProps) {
                 {[...Array(3)].map((_, i) => (
                   <motion.div
                     key={i}
-                    className="absolute bottom-0 w-1.5 h-1.5 bg-white/40 rounded-full"
-                    style={{ left: `${30 + i * 20}%` }}
+                    className="absolute bottom-0"
+                    style={{
+                      left: `${30 + i * 20}%`
+                    }}
                     animate={{
-                      y: [0, -40],
-                      opacity: [0.6, 0],
-                      scale: [1, 0.5]
+                      y: [0, -15, -30],
+                      opacity: [0.6, 0.3, 0],
+                      scale: [0.5, 0.8, 0.3]
                     }}
                     transition={{
-                      duration: 2,
+                      duration: 2 + i * 0.5,
                       repeat: Infinity,
-                      delay: i * 0.6
+                      ease: 'easeOut'
                     }}
-                  />
+                  >
+                    <div className="w-1.5 h-1.5 bg-white/60 rounded-full" />
+                  </motion.div>
                 ))}
 
                 <p className="relative text-white font-semibold flex items-center gap-2">
-                  <motion.span
-                    animate={{ 
-                      scale: [1, 1.2, 1],
-                      rotate: [0, 10, 0]
-                    }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  >
-                    🚀
-                  </motion.span>
+                  <Flag className="w-5 h-5" />
                   Start Your Journey
                 </p>
               </motion.div>
@@ -653,111 +840,371 @@ export function QuestMap({ quest }: QuestMapProps) {
         </div>
       </div>
 
-      {/* Week Details Modal */}
+      {/* Week Details Modal - INTERACTIVE TASK MANAGEMENT */}
       <AnimatePresence>
         {selectedWeek !== null && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
             onClick={() => setSelectedWeek(null)}
           >
             <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="relative"
+              initial={{ scale: 0.85, y: 30, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.85, y: 30, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-2xl max-h-[90vh] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              <Card className="w-[500px] max-h-[80vh] overflow-hidden shadow-2xl border-2 border-indigo-100">
-                {/* Header */}
-                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 relative">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedWeek(null)}
-                    className="absolute top-4 right-4 text-white hover:bg-white/20"
-                  >
-                    <X className="w-5 h-5" />
-                  </Button>
+              <Card className="overflow-hidden shadow-2xl border-0 bg-white/95 backdrop-blur-xl">
+                {/* COMPACT HEADER */}
+                <div className="relative bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 text-white p-6 overflow-hidden">
+                  {/* Animated background blobs */}
+                  <div className="absolute inset-0 overflow-hidden opacity-40">
+                    <motion.div
+                      className="absolute -top-10 -left-10 w-40 h-40 bg-white/20 rounded-full blur-3xl"
+                      animate={{ x: [0, 20, 0], y: [0, 15, 0], scale: [1, 1.1, 1] }}
+                      transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+                    />
+                    <motion.div
+                      className="absolute -bottom-10 -right-10 w-48 h-48 bg-pink-400/30 rounded-full blur-3xl"
+                      animate={{ x: [0, -15, 0], y: [0, -20, 0], scale: [1, 1.15, 1] }}
+                      transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
+                    />
+                  </div>
 
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                      <Calendar className="w-6 h-6" />
+                  {/* Close button */}
+                  <motion.button
+                    onClick={() => setSelectedWeek(null)}
+                    className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xl flex items-center justify-center transition-colors z-10"
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <X className="w-4 h-4" />
+                  </motion.button>
+
+                  {/* Header content - with progress ring */}
+                  <div className="relative flex items-center justify-between gap-6">
+                    <div className="flex items-center gap-4 flex-1">
+                      <motion.div
+                        className="relative w-14 h-14"
+                        initial={{ scale: 0, rotate: -180 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        transition={{ type: 'spring', delay: 0.2 }}
+                      >
+                        {/* Circular progress ring */}
+                        <svg className="w-14 h-14 -rotate-90" viewBox="0 0 36 36">
+                          {/* Background circle */}
+                          <circle
+                            cx="18"
+                            cy="18"
+                            r="14"
+                            fill="none"
+                            stroke="rgba(255,255,255,0.2)"
+                            strokeWidth="3"
+                          />
+                          {/* Progress circle */}
+                          <motion.circle
+                            cx="18"
+                            cy="18"
+                            r="14"
+                            fill="none"
+                            stroke="white"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeDasharray="88"
+                            initial={{ strokeDashoffset: 88 }}
+                            animate={{ 
+                              strokeDashoffset: weeks[selectedWeek].isComplete ? 0 : 88 - (88 * 0.4)
+                            }}
+                            transition={{ duration: 1, delay: 0.4, ease: 'easeOut' }}
+                          />
+                        </svg>
+                        {/* Center icon */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Calendar className="w-6 h-6" />
+                        </div>
+                      </motion.div>
+                      
+                      <div className="flex-1">
+                        <motion.h3 
+                          className="text-2xl mb-0.5"
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.2 }}
+                        >
+                          Week {weeks[selectedWeek].week}
+                        </motion.h3>
+                        <motion.div
+                          className="flex items-center gap-2"
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.3 }}
+                        >
+                          <Badge className={`${
+                            weeks[selectedWeek].isComplete
+                              ? 'bg-emerald-400/30 hover:bg-emerald-400/40 text-emerald-100'
+                              : weeks[selectedWeek].isCurrent
+                                ? 'bg-orange-400/30 hover:bg-orange-400/40 text-orange-100'
+                                : 'bg-white/20 hover:bg-white/30 text-white'
+                          } border-0 px-2.5 py-0.5 text-xs`}>
+                            {weeks[selectedWeek].isComplete ? '✓ Complete' : weeks[selectedWeek].isCurrent ? '● Active' : '○ Upcoming'}
+                          </Badge>
+                          {!weeks[selectedWeek].isComplete && (
+                            <span className="text-xs text-white/70">3/7 days</span>
+                          )}
+                        </motion.div>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-2xl">Week {weeks[selectedWeek].week}</h3>
-                      <p className="text-indigo-100 text-sm">
-                        {weeks[selectedWeek].isComplete ? 'Completed' : weeks[selectedWeek].isCurrent ? 'Current Week' : 'Upcoming'}
-                      </p>
-                    </div>
+
+                    {/* Focus pill */}
+                    <motion.div
+                      className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-xl border border-white/20"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.4 }}
+                    >
+                      <Target className="w-4 h-4 text-white/80" />
+                      <span className="text-xs text-white/90 max-w-[180px] truncate">{weeks[selectedWeek].milestone}</span>
+                    </motion.div>
                   </div>
                 </div>
 
-                {/* Content */}
-                <div className="p-6 space-y-6 overflow-y-auto" style={{ maxHeight: '60vh' }}>
-                  {/* Status Badge */}
-                  <div className="flex justify-center">
-                    <Badge className={`text-sm px-4 py-2 ${
-                      weeks[selectedWeek].isComplete
-                        ? 'bg-green-600'
-                        : weeks[selectedWeek].isCurrent
-                          ? 'bg-indigo-600'
-                          : 'bg-slate-400'
-                    }`}>
-                      {weeks[selectedWeek].isComplete ? '✓ Completed' : weeks[selectedWeek].isCurrent ? '◉ In Progress' : '○ Upcoming'}
-                    </Badge>
-                  </div>
+                {/* Current week energy boost */}
+                {weeks[selectedWeek].isCurrent && (
+                  <motion.div
+                    className="relative px-5 py-3 bg-gradient-to-r from-orange-100 via-pink-100 to-rose-100 overflow-hidden"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent"
+                      animate={{ x: ['-100%', '200%'] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                    />
+                    <p className="relative text-sm text-orange-900 flex items-center gap-2 font-medium">
+                      <motion.span
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                      >
+                        🔥
+                      </motion.span>
+                      You're crushing it! Keep the momentum going.
+                    </p>
+                  </motion.div>
+                )}
 
-                  {/* Milestone Info */}
-                  <div>
-                    <p className="text-sm text-slate-600 mb-2 uppercase tracking-wide">Focus Area</p>
-                    <Card className="p-4 bg-indigo-50 border-indigo-200">
-                      <div className="flex items-center gap-2">
-                        <Target className="w-5 h-5 text-indigo-600" />
-                        <p className="text-indigo-900 font-medium">{weeks[selectedWeek].milestone}</p>
-                      </div>
-                    </Card>
-                  </div>
+                {/* ACCORDION DAYS WITH TASK MANAGEMENT */}
+                <div className="p-6 bg-gradient-to-b from-slate-50 to-white max-h-[calc(90vh-240px)] overflow-y-auto">
+                  <motion.div
+                    className="flex items-center justify-between mb-4"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-indigo-600" />
+                      <h4 className="text-sm uppercase tracking-wider text-slate-600 font-semibold">Your 7-Day Plan</h4>
+                    </div>
+                    <span className="text-xs text-slate-500">Click days to manage tasks</span>
+                  </motion.div>
 
-                  {/* Weekly Tasks */}
-                  <div>
-                    <p className="text-sm text-slate-600 mb-3 uppercase tracking-wide">Weekly Tasks</p>
-                    <div className="space-y-3">
-                      {weeks[selectedWeek].tasks.map((task, idx) => (
-                        <div
-                          key={idx}
-                          className={`flex items-start gap-3 p-3 rounded-lg transition-colors ${
-                            weeks[selectedWeek].isComplete ? 'bg-green-50' : 'bg-slate-50'
-                          }`}
+                  <Accordion 
+                    type="multiple" 
+                    className="space-y-2"
+                    value={currentDayAccordion}
+                    onValueChange={setCurrentDayAccordion}
+                  >
+                    {[
+                      { day: 'monday', name: 'Monday', gradient: 'from-indigo-500 to-indigo-600', borderColor: 'border-indigo-200', emoji: '💪' },
+                      { day: 'tuesday', name: 'Tuesday', gradient: 'from-purple-500 to-purple-600', borderColor: 'border-purple-200', emoji: '🎯' },
+                      { day: 'wednesday', name: 'Wednesday', gradient: 'from-pink-500 to-pink-600', borderColor: 'border-pink-200', emoji: '⚡' },
+                      { day: 'thursday', name: 'Thursday', gradient: 'from-orange-500 to-orange-600', borderColor: 'border-orange-200', emoji: '🚀' },
+                      { day: 'friday', name: 'Friday', gradient: 'from-emerald-500 to-emerald-600', borderColor: 'border-emerald-200', emoji: '🎉' },
+                      { day: 'saturday', name: 'Saturday', gradient: 'from-teal-500 to-teal-600', borderColor: 'border-teal-200', emoji: '✨' },
+                      { day: 'sunday', name: 'Sunday', gradient: 'from-violet-500 to-violet-600', borderColor: 'border-violet-200', emoji: '🌟' }
+                    ].map((dayInfo, dayIndex) => {
+                      const tasks = weeks[selectedWeek].dailyPlan[dayInfo.day] || [];
+                      const completedCount = tasks.filter(t => t.completed).length;
+                      
+                      return (
+                        <motion.div
+                          key={dayInfo.day}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.5 + dayIndex * 0.04 }}
                         >
-                          <div className="mt-0.5">
-                            {weeks[selectedWeek].isComplete ? (
-                              <CheckCircle2 className="w-5 h-5 text-green-600" />
-                            ) : (
-                              <Circle className="w-5 h-5 text-slate-400" />
-                            )}
-                          </div>
-                          <span className={weeks[selectedWeek].isComplete ? 'text-slate-700' : 'text-slate-600'}>
-                            {task}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                          <AccordionItem 
+                            value={dayInfo.day}
+                            className={`border ${dayInfo.borderColor} rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-all`}
+                          >
+                            <AccordionTrigger className="px-4 py-3 hover:no-underline group [&[data-state=open]]:bg-gradient-to-r [&[data-state=open]]:from-slate-50 [&[data-state=open]]:to-white">
+                              <div className="flex items-center gap-3 flex-1">
+                                <motion.div
+                                  className={`w-9 h-9 rounded-lg bg-gradient-to-br ${dayInfo.gradient} flex items-center justify-center text-white shadow-md`}
+                                  whileHover={{ scale: 1.05 }}
+                                >
+                                  <span className="text-base">{dayInfo.emoji}</span>
+                                </motion.div>
+                                <div className="flex-1 text-left">
+                                  <p className="font-semibold text-slate-800">{dayInfo.name}</p>
+                                  <p className="text-xs text-slate-500">
+                                    {completedCount}/{tasks.length} completed
+                                    {completedCount === tasks.length && tasks.length > 0 && (
+                                      <span className="ml-2 text-emerald-600">✓ All done!</span>
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="px-4 pb-4 pt-2">
+                              <Reorder.Group 
+                                axis="y" 
+                                values={tasks} 
+                                onReorder={(newOrder) => reorderTasks(selectedWeek, dayInfo.day, newOrder)}
+                                className="space-y-2.5"
+                              >
+                                {tasks.map((task) => (
+                                  <Reorder.Item 
+                                    key={task.id} 
+                                    value={task}
+                                    className="group/task"
+                                  >
+                                    <motion.div
+                                      className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-slate-50/50 transition-colors"
+                                      layout
+                                    >
+                                      {/* Drag handle */}
+                                      <motion.div
+                                        className="opacity-0 group-hover/task:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                                        whileHover={{ scale: 1.1 }}
+                                      >
+                                        <GripVertical className="w-4 h-4 text-slate-400 mt-0.5" />
+                                      </motion.div>
 
-                  {/* Current week highlight */}
-                  {weeks[selectedWeek].isCurrent && (
-                    <div>
-                      <p className="text-sm text-slate-600 mb-2 uppercase tracking-wide">This Week</p>
-                      <Card className="p-4 bg-gradient-to-r from-orange-50 to-red-50 border-orange-200">
-                        <p className="text-sm text-orange-900">
-                          🔥 You're on week {weeks[selectedWeek].week} of your journey. Keep up the great work!
-                        </p>
-                      </Card>
-                    </div>
-                  )}
+                                      {/* Checkbox */}
+                                      <motion.button
+                                        onClick={() => toggleTaskComplete(selectedWeek, dayInfo.day, task.id)}
+                                        whileHover={{ scale: 1.2 }}
+                                        whileTap={{ scale: 0.9 }}
+                                        className="mt-0.5"
+                                      >
+                                        {task.completed ? (
+                                          <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                                        ) : (
+                                          <Circle className="w-5 h-5 text-slate-400 flex-shrink-0 group-hover/task:text-slate-600 transition-colors" />
+                                        )}
+                                      </motion.button>
+
+                                      {/* Task text or edit input */}
+                                      <div className="flex-1 min-w-0">
+                                        {editingTask?.day === dayInfo.day && editingTask?.taskId === task.id ? (
+                                          <div className="flex items-center gap-2">
+                                            <Input
+                                              value={editText}
+                                              onChange={(e) => setEditText(e.target.value)}
+                                              className="h-8 text-sm"
+                                              autoFocus
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') saveEditTask(selectedWeek, dayInfo.day, task.id);
+                                                if (e.key === 'Escape') setEditingTask(null);
+                                              }}
+                                            />
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              className="h-8 w-8 p-0"
+                                              onClick={() => saveEditTask(selectedWeek, dayInfo.day, task.id)}
+                                            >
+                                              <Check className="w-4 h-4 text-emerald-600" />
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              className="h-8 w-8 p-0"
+                                              onClick={() => setEditingTask(null)}
+                                            >
+                                              <XCircle className="w-4 h-4 text-slate-400" />
+                                            </Button>
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className={`text-sm text-slate-700 leading-relaxed ${task.completed ? 'line-through text-slate-400' : ''}`}>
+                                              {task.text}
+                                            </span>
+                                            {/* Priority badge */}
+                                            <motion.button
+                                              onClick={() => changePriority(selectedWeek, dayInfo.day, task.id)}
+                                              whileHover={{ scale: 1.1 }}
+                                              whileTap={{ scale: 0.9 }}
+                                            >
+                                              <Badge 
+                                                variant="outline" 
+                                                className={`text-xs px-2 py-0 h-5 ${getPriorityColor(task.priority)} cursor-pointer`}
+                                              >
+                                                {getPriorityIcon(task.priority)} {task.priority}
+                                              </Badge>
+                                            </motion.button>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Action buttons */}
+                                      {editingTask?.day !== dayInfo.day || editingTask?.taskId !== task.id ? (
+                                        <div className="flex items-center gap-1 opacity-0 group-hover/task:opacity-100 transition-opacity">
+                                          {onAskAI && (
+                                            <motion.button
+                                              onClick={() => onAskAI(task.text, quest.name, dayInfo.day)}
+                                              className="p-1.5 hover:bg-indigo-100 rounded-md transition-colors group/ai"
+                                              whileHover={{ scale: 1.1 }}
+                                              whileTap={{ scale: 0.9 }}
+                                              title="Ask AI about this task"
+                                            >
+                                              <MessageCircle className="w-3.5 h-3.5 text-indigo-600 group-hover/ai:text-indigo-700" />
+                                            </motion.button>
+                                          )}
+                                          <motion.button
+                                            onClick={() => startEditTask(dayInfo.day, task.id, task.text)}
+                                            className="p-1.5 hover:bg-slate-200 rounded-md transition-colors"
+                                            whileHover={{ scale: 1.1 }}
+                                            whileTap={{ scale: 0.9 }}
+                                          >
+                                            <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+                                          </motion.button>
+                                          <motion.button
+                                            onClick={() => deleteTask(selectedWeek, dayInfo.day, task.id)}
+                                            className="p-1.5 hover:bg-red-100 rounded-md transition-colors"
+                                            whileHover={{ scale: 1.1 }}
+                                            whileTap={{ scale: 0.9 }}
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                          </motion.button>
+                                        </div>
+                                      ) : null}
+                                    </motion.div>
+                                  </Reorder.Item>
+                                ))}
+                              </Reorder.Group>
+
+                              {/* Add new task button */}
+                              <motion.button
+                                onClick={() => addNewTask(selectedWeek, dayInfo.day)}
+                                className="w-full mt-3 px-3 py-2 border-2 border-dashed border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 rounded-lg text-sm text-slate-500 hover:text-indigo-600 transition-all flex items-center justify-center gap-2"
+                                whileHover={{ scale: 1.01 }}
+                                whileTap={{ scale: 0.99 }}
+                              >
+                                <Plus className="w-4 h-4" />
+                                Add new task
+                              </motion.button>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </motion.div>
+                      );
+                    })}
+                  </Accordion>
                 </div>
               </Card>
             </motion.div>
