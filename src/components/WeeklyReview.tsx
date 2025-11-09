@@ -18,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
-import { X, TrendingUp, CheckCircle2, Calendar, Trophy, Lightbulb, Target, MessageCircle, Edit2, Trash2, MoreVertical, Save, XCircle, Sparkles, Plus, List } from 'lucide-react';
+import { X, TrendingUp, CheckCircle2, Calendar, Trophy, Lightbulb, Target, MessageCircle, Edit2, Trash2, MoreVertical, Save, XCircle, Sparkles, Plus, List, ArrowLeft, Compass } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface WeeklyReviewProps {
@@ -28,10 +28,9 @@ interface WeeklyReviewProps {
   onAskAIAboutNextWeek?: () => void;
   onAskAIAboutPlanDay?: (day: string) => void;
   onAskAIAboutTask?: (taskText: string, questName: string) => void;
-  isChatOpen?: boolean;
 }
 
-export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAskAIAboutNextWeek, onAskAIAboutPlanDay, onAskAIAboutTask, isChatOpen = false }: WeeklyReviewProps) {
+export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAskAIAboutNextWeek, onAskAIAboutPlanDay, onAskAIAboutTask }: WeeklyReviewProps) {
   const [step, setStep] = useState<'celebrate' | 'reflect' | 'plan'>('celebrate');
   const [reflection, setReflection] = useState('');
   const [hoveredDay, setHoveredDay] = useState<string | null>(null);
@@ -133,32 +132,39 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm flex items-center justify-center p-8"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ scale: 0.9, y: 20 }}
-        animate={{ 
-          scale: 1, 
-          y: 0,
-          x: isChatOpen ? '-24%' : '0%',
-          width: isChatOpen ? '48vw' : '70vw'
-        }}
-        exit={{ scale: 0.9, y: 20 }}
-        transition={{
-          type: 'spring',
-          stiffness: 300,
-          damping: 30
-        }}
-        className="bg-white rounded-2xl shadow-2xl max-h-[90vh] overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-8 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      {/* Header */}
+      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 60, repeat: Infinity, ease: 'linear' }}
+            >
+              <Compass className="w-6 h-6 text-indigo-600" strokeWidth={2} />
+            </motion.div>
+            <span className="text-xl">Compass</span>
+          </div>
+          
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Dashboard
+          </Button>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-8 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-2xl shadow-xl overflow-hidden"
+        >
+          {/* Review Header */}
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-8 relative overflow-hidden">
           {/* Animated gradient overlay */}
           <motion.div
             className="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-pink-500/20 to-purple-500/0"
@@ -195,15 +201,6 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
               />
             ))}
           </div>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="absolute top-4 right-4 text-white hover:bg-white/20 z-10"
-          >
-            <X className="w-5 h-5" />
-          </Button>
           
           {/* Title with Animated Calendar Icon */}
           <div className="flex items-center gap-3 mb-2 relative z-10">
@@ -361,7 +358,7 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto pb-6" style={{ maxHeight: 'calc(90vh - 240px)' }}>
+        <div className="p-8 overflow-y-auto max-h-screen">
           {step === 'celebrate' && (
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -986,7 +983,8 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
             </motion.div>
           )}
         </div>
-      </motion.div>
-    </motion.div>
+        </motion.div>
+      </div>
+    </div>
   );
 }

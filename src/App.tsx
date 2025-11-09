@@ -1,12 +1,12 @@
 import { useState } from 'react';
+import { LandingPage } from './components/LandingPage';
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { Dashboard } from './components/Dashboard';
 import { ChatWidget } from './components/ChatWidget';
 import { WeeklyReview } from './components/WeeklyReview';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<'onboarding' | 'dashboard'>('onboarding');
-  const [showWeeklyReview, setShowWeeklyReview] = useState(false);
+  const [currentScreen, setCurrentScreen] = useState<'landing' | 'onboarding' | 'dashboard' | 'weeklyReview'>('landing');
   const [chatOpen, setChatOpen] = useState(false);
   const [chatContext, setChatContext] = useState<string | null>(null);
   const [userData, setUserData] = useState({
@@ -61,34 +61,43 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      {currentScreen === 'onboarding' ? (
+      {currentScreen === 'landing' ? (
+        <LandingPage onGetStarted={() => setCurrentScreen('onboarding')} />
+      ) : currentScreen === 'onboarding' ? (
         <OnboardingScreen onComplete={handleOnboardingComplete} />
-      ) : (
+      ) : currentScreen === 'weeklyReview' ? (
         <>
-          <Dashboard 
-            userData={userData} 
-            onOpenWeeklyReview={() => setShowWeeklyReview(true)}
-            onOpenChatForQuest={handleOpenChatForQuest}
-            onAskAIAboutTask={handleAskAIAboutTask}
-            onAskAIAboutQuest={handleAskAIAboutQuest}
+          <WeeklyReview 
+            onClose={() => setCurrentScreen('dashboard')}
+            onAskAIAboutWeek={handleAskAIAboutWeek}
+            onAskAIAboutDay={handleAskAIAboutDay}
+            onAskAIAboutNextWeek={handleAskAIAboutNextWeek}
+            onAskAIAboutPlanDay={handleAskAIAboutPlanDay}
+            onAskAIAboutTask={handleAskAIAboutPlanTask}
           />
-          {showWeeklyReview && (
-            <WeeklyReview 
-              onClose={() => setShowWeeklyReview(false)}
-              onAskAIAboutWeek={handleAskAIAboutWeek}
-              onAskAIAboutDay={handleAskAIAboutDay}
-              onAskAIAboutNextWeek={handleAskAIAboutNextWeek}
-              onAskAIAboutPlanDay={handleAskAIAboutPlanDay}
-              onAskAIAboutTask={handleAskAIAboutPlanTask}
-              isChatOpen={chatOpen}
-            />
-          )}
           <ChatWidget 
             isOpen={chatOpen}
             setIsOpen={setChatOpen}
             context={chatContext}
             onContextHandled={() => setChatContext(null)}
-            isWeeklyReviewOpen={showWeeklyReview}
+            isWeeklyReviewOpen={true}
+          />
+        </>
+      ) : (
+        <>
+          <Dashboard 
+            userData={userData} 
+            onOpenWeeklyReview={() => setCurrentScreen('weeklyReview')}
+            onOpenChatForQuest={handleOpenChatForQuest}
+            onAskAIAboutTask={handleAskAIAboutTask}
+            onAskAIAboutQuest={handleAskAIAboutQuest}
+          />
+          <ChatWidget 
+            isOpen={chatOpen}
+            setIsOpen={setChatOpen}
+            context={chatContext}
+            onContextHandled={() => setChatContext(null)}
+            isWeeklyReviewOpen={false}
           />
         </>
       )}

@@ -32,7 +32,7 @@ import {
   CheckCircle2, Circle, Edit2, Trash2, Plus, GripVertical, Check, XCircle,
   MoreVertical, Pause, Play, Archive, TrendingUp, AlertCircle, Sparkles, Star, MessageCircle,
   Compass, User, Settings, LogOut, HelpCircle, Bell, Shield, CreditCard, Keyboard,
-  Moon, Sun, Palette, Zap, Mail, Lock, Eye, Download, Upload
+  Moon, Sun, Palette, Zap, Mail, Lock, Eye, Download, Upload, Menu, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 interface Task {
@@ -53,6 +53,9 @@ interface DashboardProps {
 
 export function Dashboard({ userData, onOpenWeeklyReview, onOpenChatForQuest, onAskAIAboutTask, onAskAIAboutQuest }: DashboardProps) {
   const [selectedQuest, setSelectedQuest] = useState(userData.quests[0]);
+  
+  // Sidebar collapsed state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   // North Star state
   const [northStar, setNorthStar] = useState(userData.northStar);
@@ -383,8 +386,15 @@ export function Dashboard({ userData, onOpenWeeklyReview, onOpenChatForQuest, on
 
       {/* Three Column Layout */}
       <div className="flex h-[calc(100vh-73px)]">
-        {/* Left Column - The "Why" - REDESIGNED & INTERACTIVE */}
-        <div className="w-80 border-r bg-gradient-to-b from-white via-indigo-50/20 to-purple-50/30 overflow-y-auto relative">
+        {/* Left Column - The "Why" - COLLAPSIBLE SIDEBAR */}
+        <motion.div
+          initial={false}
+          animate={{ 
+            width: sidebarCollapsed ? 0 : 320 
+          }}
+          transition={{ duration: 0.3, ease: 'easeInOut' }}
+          className="border-r bg-gradient-to-b from-white via-indigo-50/20 to-purple-50/30 overflow-hidden relative"
+        >
           {/* Floating particles background */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {[...Array(8)].map((_, i) => (
@@ -408,375 +418,393 @@ export function Dashboard({ userData, onOpenWeeklyReview, onOpenChatForQuest, on
             ))}
           </div>
 
-          <div className="p-6 space-y-6 relative z-10">
-            {/* Quick Stats Widget */}
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="grid grid-cols-3 gap-2"
-            >
-              <Card className="p-3 text-center bg-white/60 backdrop-blur-sm border-indigo-200/50">
-                <div className="text-2xl text-indigo-600 mb-1">{quests.length}</div>
-                <div className="text-xs text-slate-600">Quests</div>
-              </Card>
-              <Card className="p-3 text-center bg-white/60 backdrop-blur-sm border-purple-200/50">
-                <div className="text-2xl text-purple-600 mb-1">{avgProgress}%</div>
-                <div className="text-xs text-slate-600">Avg</div>
-              </Card>
-              <Card className="p-3 text-center bg-white/60 backdrop-blur-sm border-emerald-200/50">
-                <div className="text-2xl text-emerald-600 mb-1">28</div>
-                <div className="text-xs text-slate-600">Streak</div>
-              </Card>
-            </motion.div>
+          <div className="w-80 h-full overflow-y-auto">
+            <div className="p-6 space-y-6 relative z-10">
+              {/* Quick Stats Widget */}
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="grid grid-cols-3 gap-2"
+              >
+                <Card className="p-3 text-center bg-white/60 backdrop-blur-sm border-indigo-200/50">
+                  <div className="text-2xl text-indigo-600 mb-1">{quests.length}</div>
+                  <div className="text-xs text-slate-600">Quests</div>
+                </Card>
+                <Card className="p-3 text-center bg-white/60 backdrop-blur-sm border-purple-200/50">
+                  <div className="text-2xl text-purple-600 mb-1">{avgProgress}%</div>
+                  <div className="text-xs text-slate-600">Avg</div>
+                </Card>
+                <Card className="p-3 text-center bg-white/60 backdrop-blur-sm border-emerald-200/50">
+                  <div className="text-2xl text-emerald-600 mb-1">28</div>
+                  <div className="text-xs text-slate-600">Streak</div>
+                </Card>
+              </motion.div>
 
-            {/* North Star - EDITABLE */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
-                  <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                  Your North Star
-                </h3>
-                {!editingNorthStar && (
+              {/* North Star - EDITABLE */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
+                    <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                    Your North Star
+                  </h3>
+                  {!editingNorthStar && (
+                    <motion.button
+                      onClick={() => {
+                        setEditingNorthStar(true);
+                        setNorthStarText(northStar);
+                      }}
+                      className="p-1 hover:bg-slate-200 rounded-md transition-colors opacity-0 hover:opacity-100"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <Edit2 className="w-3 h-3 text-slate-500" />
+                    </motion.button>
+                  )}
+                </div>
+                
+                <motion.div layout>
+                  <Card className="p-6 bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200 shadow-lg relative overflow-hidden group">
+                    {/* Animated gradient overlay */}
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-indigo-400/0 via-purple-400/10 to-indigo-400/0"
+                      animate={{
+                        x: ['-100%', '100%'],
+                      }}
+                      transition={{
+                        duration: 3,
+                        repeat: Infinity,
+                        ease: 'linear',
+                      }}
+                    />
+                    
+                    <div className="relative z-10">
+                      {editingNorthStar ? (
+                        <div className="space-y-3">
+                          <Textarea
+                            value={northStarText}
+                            onChange={(e) => setNorthStarText(e.target.value)}
+                            className="min-h-[100px] bg-white/80 resize-none"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') setEditingNorthStar(false);
+                            }}
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={saveNorthStar}
+                              className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                            >
+                              <Check className="w-3.5 h-3.5 mr-1.5" />
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingNorthStar(false)}
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-3">
+                          <motion.div
+                            animate={{ rotate: [0, 5, -5, 0] }}
+                            transition={{ duration: 2, repeat: Infinity }}
+                          >
+                            <Target className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                          </motion.div>
+                          <p className="text-indigo-900 leading-relaxed">{northStar}</p>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                </motion.div>
+              </div>
+
+              <Separator />
+
+              {/* Active Quests - FULLY INTERACTIVE */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                    Active Quests
+                  </h3>
                   <motion.button
-                    onClick={() => {
-                      setEditingNorthStar(true);
-                      setNorthStarText(northStar);
-                    }}
-                    className="p-1 hover:bg-slate-200 rounded-md transition-colors opacity-0 hover:opacity-100"
+                    onClick={onOpenChatForQuest || addNewQuest}
+                    className="p-1.5 hover:bg-indigo-100 rounded-md transition-colors text-indigo-600"
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                   >
-                    <Edit2 className="w-3 h-3 text-slate-500" />
+                    <Plus className="w-4 h-4" />
                   </motion.button>
-                )}
-              </div>
-              
-              <motion.div layout>
-                <Card className="p-6 bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200 shadow-lg relative overflow-hidden group">
-                  {/* Animated gradient overlay */}
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-indigo-400/0 via-purple-400/10 to-indigo-400/0"
-                    animate={{
-                      x: ['-100%', '100%'],
-                    }}
-                    transition={{
-                      duration: 3,
-                      repeat: Infinity,
-                      ease: 'linear',
-                    }}
-                  />
-                  
-                  <div className="relative z-10">
-                    {editingNorthStar ? (
-                      <div className="space-y-3">
-                        <Textarea
-                          value={northStarText}
-                          onChange={(e) => setNorthStarText(e.target.value)}
-                          className="min-h-[100px] bg-white/80 resize-none"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Escape') setEditingNorthStar(false);
-                          }}
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={saveNorthStar}
-                            className="flex-1 bg-indigo-600 hover:bg-indigo-700"
-                          >
-                            <Check className="w-3.5 h-3.5 mr-1.5" />
-                            Save
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setEditingNorthStar(false)}
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-start gap-3">
-                        <motion.div
-                          animate={{ rotate: [0, 5, -5, 0] }}
-                          transition={{ duration: 2, repeat: Infinity }}
-                        >
-                          <Target className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
-                        </motion.div>
-                        <p className="text-indigo-900 leading-relaxed">{northStar}</p>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </motion.div>
-            </div>
-
-            <Separator />
-
-            {/* Active Quests - FULLY INTERACTIVE */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                  Active Quests
-                </h3>
-                <motion.button
-                  onClick={onOpenChatForQuest || addNewQuest}
-                  className="p-1.5 hover:bg-indigo-100 rounded-md transition-colors text-indigo-600"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
+                </div>
+                
+                <Reorder.Group 
+                  axis="y" 
+                  values={quests} 
+                  onReorder={setQuests}
+                  className="space-y-3"
                 >
-                  <Plus className="w-4 h-4" />
-                </motion.button>
-              </div>
-              
-              <Reorder.Group 
-                axis="y" 
-                values={quests} 
-                onReorder={setQuests}
-                className="space-y-3"
-              >
-                <AnimatePresence>
-                  {quests.map((quest: any, index: number) => {
-                    const health = getQuestHealth(quest);
-                    const HealthIcon = health.icon;
-                    const isPaused = pausedQuests.has(quest.id);
-                    
-                    return (
-                      <Reorder.Item 
-                        key={quest.id} 
-                        value={quest}
-                        className="group/quest"
-                      >
-                        <motion.div
-                          layout
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, x: -100 }}
+                  <AnimatePresence>
+                    {quests.map((quest: any, index: number) => {
+                      const health = getQuestHealth(quest);
+                      const HealthIcon = health.icon;
+                      const isPaused = pausedQuests.has(quest.id);
+                      
+                      return (
+                        <Reorder.Item 
+                          key={quest.id} 
+                          value={quest}
+                          className="group/quest"
                         >
-                          <Card
-                            className={`p-4 transition-all relative overflow-hidden ${
-                              selectedQuest.id === quest.id
-                                ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-2xl ring-2 ring-indigo-400 ring-offset-2'
-                                : 'hover:bg-slate-50 hover:shadow-lg cursor-pointer bg-white/80 backdrop-blur-sm'
-                            } ${isPaused ? 'opacity-60' : ''}`}
-                            onClick={() => !editingQuestId && setSelectedQuest(quest)}
+                          <motion.div
+                            layout
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, x: -100 }}
                           >
-                            {/* Drag handle */}
-                            <motion.div
-                              className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/quest:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
-                              whileHover={{ scale: 1.2 }}
+                            <Card
+                              className={`p-4 transition-all relative overflow-hidden ${
+                                selectedQuest.id === quest.id
+                                  ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-2xl ring-2 ring-indigo-400 ring-offset-2'
+                                  : 'hover:bg-slate-50 hover:shadow-lg cursor-pointer bg-white/80 backdrop-blur-sm'
+                              } ${isPaused ? 'opacity-60' : ''}`}
+                              onClick={() => !editingQuestId && setSelectedQuest(quest)}
                             >
-                              <GripVertical className={`w-3.5 h-3.5 ${
-                                selectedQuest.id === quest.id ? 'text-white/60' : 'text-slate-400'
-                              }`} />
-                            </motion.div>
+                              {/* Drag handle */}
+                              <motion.div
+                                className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/quest:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                                whileHover={{ scale: 1.2 }}
+                              >
+                                <GripVertical className={`w-3.5 h-3.5 ${
+                                  selectedQuest.id === quest.id ? 'text-white/60' : 'text-slate-400'
+                                }`} />
+                              </motion.div>
 
-                            <div className="pl-3">
-                              {/* Header row */}
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex-1 min-w-0">
-                                  {editingQuestId === quest.id ? (
-                                    <div className="flex items-center gap-2">
-                                      <Input
-                                        value={editingQuestName}
-                                        onChange={(e) => setEditingQuestName(e.target.value)}
-                                        className="h-8 text-sm"
-                                        autoFocus
-                                        onClick={(e) => e.stopPropagation()}
-                                        onKeyDown={(e) => {
+                              <div className="pl-3">
+                                {/* Header row */}
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="flex-1 min-w-0">
+                                    {editingQuestId === quest.id ? (
+                                      <div className="flex items-center gap-2">
+                                        <Input
+                                          value={editingQuestName}
+                                          onChange={(e) => setEditingQuestName(e.target.value)}
+                                          className="h-8 text-sm"
+                                          autoFocus
+                                          onClick={(e) => e.stopPropagation()}
+                                          onKeyDown={(e) => {
+                                            e.stopPropagation();
+                                            if (e.key === 'Enter') saveEditQuest(quest.id);
+                                            if (e.key === 'Escape') setEditingQuestId(null);
+                                          }}
+                                        />
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-8 w-8 p-0"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            saveEditQuest(quest.id);
+                                          }}
+                                        >
+                                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium truncate">{quest.name}</span>
+                                        {isPaused && (
+                                          <Badge variant="outline" className="text-xs px-1.5 py-0 h-5 bg-amber-100 text-amber-700 border-amber-300">
+                                            Paused
+                                          </Badge>
+                                        )}
+                                        {index === 0 && selectedQuest.id !== quest.id && (
+                                          <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5">Primary</Badge>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Actions dropdown */}
+                                  {editingQuestId !== quest.id && (
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                        <motion.button
+                                          className={`p-1 rounded-md transition-colors opacity-0 group-hover/quest:opacity-100 ${
+                                            selectedQuest.id === quest.id 
+                                              ? 'hover:bg-white/20 text-white' 
+                                              : 'hover:bg-slate-200 text-slate-600'
+                                          }`}
+                                          whileHover={{ scale: 1.1 }}
+                                          whileTap={{ scale: 0.9 }}
+                                        >
+                                          <MoreVertical className="w-4 h-4" />
+                                        </motion.button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="w-48">
+                                        <DropdownMenuItem onClick={(e) => {
                                           e.stopPropagation();
-                                          if (e.key === 'Enter') saveEditQuest(quest.id);
-                                          if (e.key === 'Escape') setEditingQuestId(null);
-                                        }}
-                                      />
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-8 w-8 p-0"
-                                        onClick={(e) => {
+                                          if (onAskAIAboutQuest) {
+                                            onAskAIAboutQuest(
+                                              quest.name, 
+                                              quest.progress, 
+                                              quest.milestones[quest.currentMilestone]
+                                            );
+                                          }
+                                        }}>
+                                          <MessageCircle className="w-4 h-4 mr-2 text-indigo-600" />
+                                          <span className="text-indigo-600">Ask AI</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={(e) => {
                                           e.stopPropagation();
-                                          saveEditQuest(quest.id);
-                                        }}
-                                      >
-                                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium truncate">{quest.name}</span>
-                                      {isPaused && (
-                                        <Badge variant="outline" className="text-xs px-1.5 py-0 h-5 bg-amber-100 text-amber-700 border-amber-300">
-                                          Paused
-                                        </Badge>
-                                      )}
-                                      {index === 0 && selectedQuest.id !== quest.id && (
-                                        <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5">Primary</Badge>
-                                      )}
-                                    </div>
+                                          startEditQuest(quest.id, quest.name);
+                                        }}>
+                                          <Edit2 className="w-4 h-4 mr-2" />
+                                          Edit Name
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={(e) => {
+                                          e.stopPropagation();
+                                          togglePauseQuest(quest.id);
+                                        }}>
+                                          {isPaused ? (
+                                            <>
+                                              <Play className="w-4 h-4 mr-2" />
+                                              Resume Quest
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Pause className="w-4 h-4 mr-2" />
+                                              Pause Quest
+                                            </>
+                                          )}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                                          <Archive className="w-4 h-4 mr-2" />
+                                          Archive
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem 
+                                          className="text-red-600"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setQuestToDelete(quest);
+                                          }}
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" />
+                                          Delete
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
                                   )}
                                 </div>
+
+                                {/* Quest health indicator */}
+                                <div className="flex items-center gap-2 mb-2">
+                                  <HealthIcon className={`w-3.5 h-3.5 ${
+                                    selectedQuest.id === quest.id 
+                                      ? 'text-white/80' 
+                                      : `text-${health.color}-500`
+                                  }`} />
+                                  <span className={`text-xs ${
+                                    selectedQuest.id === quest.id 
+                                      ? 'text-white/80' 
+                                      : 'text-slate-500'
+                                  }`}>
+                                    Milestone {quest.currentMilestone + 1}/{quest.milestones.length}
+                                  </span>
+                                </div>
+
+                                {/* Progress bar */}
+                                <Progress 
+                                  value={quest.progress} 
+                                  className={`h-2 ${selectedQuest.id === quest.id ? 'bg-indigo-400' : ''}`}
+                                />
                                 
-                                {/* Actions dropdown */}
-                                {editingQuestId !== quest.id && (
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                      <motion.button
-                                        className={`p-1 rounded-md transition-colors opacity-0 group-hover/quest:opacity-100 ${
-                                          selectedQuest.id === quest.id 
-                                            ? 'hover:bg-white/20 text-white' 
-                                            : 'hover:bg-slate-200 text-slate-600'
-                                        }`}
-                                        whileHover={{ scale: 1.1 }}
-                                        whileTap={{ scale: 0.9 }}
-                                      >
-                                        <MoreVertical className="w-4 h-4" />
-                                      </motion.button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-48">
-                                      <DropdownMenuItem onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (onAskAIAboutQuest) {
-                                          onAskAIAboutQuest(
-                                            quest.name, 
-                                            quest.progress, 
-                                            quest.milestones[quest.currentMilestone]
-                                          );
-                                        }
-                                      }}>
-                                        <MessageCircle className="w-4 h-4 mr-2 text-indigo-600" />
-                                        <span className="text-indigo-600">Ask AI</span>
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem onClick={(e) => {
-                                        e.stopPropagation();
-                                        startEditQuest(quest.id, quest.name);
-                                      }}>
-                                        <Edit2 className="w-4 h-4 mr-2" />
-                                        Edit Name
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={(e) => {
-                                        e.stopPropagation();
-                                        togglePauseQuest(quest.id);
-                                      }}>
-                                        {isPaused ? (
-                                          <>
-                                            <Play className="w-4 h-4 mr-2" />
-                                            Resume Quest
-                                          </>
-                                        ) : (
-                                          <>
-                                            <Pause className="w-4 h-4 mr-2" />
-                                            Pause Quest
-                                          </>
-                                        )}
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
-                                        <Archive className="w-4 h-4 mr-2" />
-                                        Archive
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem 
-                                        className="text-red-600"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setQuestToDelete(quest);
-                                        }}
-                                      >
-                                        <Trash2 className="w-4 h-4 mr-2" />
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                )}
-                              </div>
-
-                              {/* Quest health indicator */}
-                              <div className="flex items-center gap-2 mb-2">
-                                <HealthIcon className={`w-3.5 h-3.5 ${
-                                  selectedQuest.id === quest.id 
-                                    ? 'text-white/80' 
-                                    : `text-${health.color}-500`
-                                }`} />
-                                <span className={`text-xs ${
-                                  selectedQuest.id === quest.id 
-                                    ? 'text-white/80' 
-                                    : 'text-slate-500'
+                                <div className={`text-xs mt-2 flex items-center justify-between ${
+                                  selectedQuest.id === quest.id ? 'text-indigo-200' : 'text-slate-500'
                                 }`}>
-                                  Milestone {quest.currentMilestone + 1}/{quest.milestones.length}
-                                </span>
+                                  <span>{quest.progress}% complete</span>
+                                  {quest.progress === 100 && (
+                                    <motion.span
+                                      initial={{ scale: 0 }}
+                                      animate={{ scale: 1 }}
+                                    >
+                                      🏆
+                                    </motion.span>
+                                  )}
+                                </div>
                               </div>
+                            </Card>
+                          </motion.div>
+                        </Reorder.Item>
+                      );
+                    })}
+                  </AnimatePresence>
+                </Reorder.Group>
 
-                              {/* Progress bar */}
-                              <Progress 
-                                value={quest.progress} 
-                                className={`h-2 ${selectedQuest.id === quest.id ? 'bg-indigo-400' : ''}`}
-                              />
-                              
-                              <div className={`text-xs mt-2 flex items-center justify-between ${
-                                selectedQuest.id === quest.id ? 'text-indigo-200' : 'text-slate-500'
-                              }`}>
-                                <span>{quest.progress}% complete</span>
-                                {quest.progress === 100 && (
-                                  <motion.span
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                  >
-                                    🏆
-                                  </motion.span>
-                                )}
-                              </div>
-                            </div>
-                          </Card>
-                        </motion.div>
-                      </Reorder.Item>
-                    );
-                  })}
-                </AnimatePresence>
-              </Reorder.Group>
-
-              {/* Add Quest Button - Big & Beautiful */}
-              {quests.length === 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-center py-8"
-                >
-                  <div className="text-slate-400 mb-3">No quests yet</div>
-                  <Button onClick={addNewQuest} className="bg-indigo-600 hover:bg-indigo-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Your First Quest
-                  </Button>
-                </motion.div>
-              )}
+                {/* Add Quest Button - Big & Beautiful */}
+                {quests.length === 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-center py-8"
+                  >
+                    <div className="text-slate-400 mb-3">No quests yet</div>
+                    <Button onClick={addNewQuest} className="bg-indigo-600 hover:bg-indigo-700">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Your First Quest
+                    </Button>
+                  </motion.div>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Delete confirmation dialog */}
-          <AlertDialog open={!!questToDelete} onOpenChange={() => setQuestToDelete(null)}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Quest?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete "{questToDelete?.name}"? This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => questToDelete && deleteQuest(questToDelete.id)}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
+            {/* Delete confirmation dialog */}
+            <AlertDialog open={!!questToDelete} onOpenChange={() => setQuestToDelete(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Quest?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete "{questToDelete?.name}"? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => questToDelete && deleteQuest(questToDelete.id)}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </motion.div>
+
+        {/* Sidebar Toggle Button - Positioned on the border */}
+        <motion.button
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className="absolute top-8 z-30 p-1.5 rounded-lg bg-white border border-slate-200 shadow-md hover:shadow-lg hover:bg-indigo-50 hover:border-indigo-300 transition-all"
+          style={{ left: sidebarCollapsed ? '0px' : '320px' }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          {sidebarCollapsed ? (
+            <ChevronRight className="w-4 h-4 text-slate-600" />
+          ) : (
+            <ChevronLeft className="w-4 h-4 text-slate-600" />
+          )}
+        </motion.button>
 
         {/* Center Column - The "What" */}
-        <div className="flex-1 overflow-y-auto bg-white">
+        <div className="flex-1 overflow-y-auto bg-white relative">
+
           <div className="p-8 space-y-6">
             {/* Quest Header */}
             <div className="pb-4 border-b">
