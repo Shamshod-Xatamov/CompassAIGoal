@@ -12,61 +12,51 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from './ui/dropdown-menu';
-import { X, TrendingUp, CheckCircle2, Calendar, Trophy, Lightbulb, Target, MessageCircle, Edit2, Trash2, MoreVertical, Save, XCircle, Sparkles, Plus, List, ArrowLeft, Compass } from 'lucide-react';
+import { X, TrendingUp, CheckCircle2, Trophy, Lightbulb, Target, MessageCircle, Edit2, Trash2, Save, XCircle, Sparkles, Plus, ArrowLeft, Compass, MapPin, Flag, Zap, Star } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface WeeklyReviewProps {
   onClose: () => void;
-  onAskAIAboutWeek?: () => void;
-  onAskAIAboutDay?: (day: string, tasksCompleted: number) => void;
-  onAskAIAboutNextWeek?: () => void;
-  onAskAIAboutPlanDay?: (day: string) => void;
+  onAskAIAboutProgress?: () => void;
+  onAskAIAboutMilestone?: (milestoneName: string) => void;
   onAskAIAboutTask?: (taskText: string, questName: string) => void;
 }
 
-export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAskAIAboutNextWeek, onAskAIAboutPlanDay, onAskAIAboutTask }: WeeklyReviewProps) {
+export function WeeklyReview({ onClose, onAskAIAboutProgress, onAskAIAboutMilestone, onAskAIAboutTask }: WeeklyReviewProps) {
   const [step, setStep] = useState<'celebrate' | 'reflect' | 'plan'>('celebrate');
   const [reflection, setReflection] = useState('');
-  const [hoveredDay, setHoveredDay] = useState<string | null>(null);
+  const [hoveredMilestone, setHoveredMilestone] = useState<string | null>(null);
 
-  const weekData = [
-    { day: 'Mon', tasks: 5, fullDay: 'Monday' },
-    { day: 'Tue', tasks: 7, fullDay: 'Tuesday' },
-    { day: 'Wed', tasks: 4, fullDay: 'Wednesday' },
-    { day: 'Thu', tasks: 8, fullDay: 'Thursday' },
-    { day: 'Fri', tasks: 6, fullDay: 'Friday' },
-    { day: 'Sat', tasks: 3, fullDay: 'Saturday' },
-    { day: 'Sun', tasks: 5, fullDay: 'Sunday' },
+  // Mock milestone data - in real app, this would come from props
+  const milestoneData = [
+    { name: 'Setup', progress: 100, tasks: 5 },
+    { name: 'Design', progress: 75, tasks: 6 },
+    { name: 'Build MVP', progress: 40, tasks: 8 },
+    { name: 'Testing', progress: 15, tasks: 4 },
+    { name: 'Launch', progress: 0, tasks: 3 },
   ];
 
   const achievements = [
-    { title: 'Tasks Completed', value: '38', icon: CheckCircle2 },
-    { title: 'Quest Progress', value: '+12%', icon: TrendingUp },
-    { title: 'Longest Streak', value: '28 days', icon: Calendar },
+    { title: 'Milestones Completed', value: '1', icon: Flag },
+    { title: 'Quest Progress', value: '46%', icon: TrendingUp },
+    { title: 'Tasks Finished', value: '12', icon: CheckCircle2 },
   ];
 
   const [tasks, setTasks] = useState([
-    { id: 1, text: 'Complete user authentication flow', quest: 'Launch Side Project', priority: 'high' as const, day: 'Monday' },
-    { id: 2, text: 'Design database schema', quest: 'Launch Side Project', priority: 'high' as const, day: 'Tuesday' },
-    { id: 3, text: 'Learn fingerpicking pattern', quest: 'Learn Guitar', priority: 'medium' as const, day: 'Wednesday' },
-    { id: 4, text: 'Morning workouts (5 days)', quest: 'Health & Fitness', priority: 'medium' as const, day: 'Monday' },
-    { id: 5, text: 'Write project documentation', quest: 'Launch Side Project', priority: 'low' as const, day: 'Friday' },
-    { id: 6, text: 'Practice chord transitions', quest: 'Learn Guitar', priority: 'medium' as const, day: 'Thursday' },
-    { id: 7, text: 'Build landing page', quest: 'Launch Side Project', priority: 'high' as const, day: 'Wednesday' },
-    { id: 8, text: 'Meal prep for week', quest: 'Health & Fitness', priority: 'medium' as const, day: 'Sunday' },
+    { id: 1, text: 'Complete user authentication flow', quest: 'Launch Side Project', milestone: 'Build MVP', priority: 'high' as const },
+    { id: 2, text: 'Design database schema', quest: 'Launch Side Project', milestone: 'Design', priority: 'high' as const },
+    { id: 3, text: 'Learn fingerpicking pattern', quest: 'Learn Guitar', milestone: 'Practice Basics', priority: 'medium' as const },
+    { id: 4, text: 'Morning workouts (5 days)', quest: 'Health & Fitness', milestone: 'Build Routine', priority: 'medium' as const },
+    { id: 5, text: 'Write project documentation', quest: 'Launch Side Project', milestone: 'Launch', priority: 'low' as const },
+    { id: 6, text: 'Create wireframes', quest: 'Launch Side Project', milestone: 'Design', priority: 'high' as const },
+    { id: 7, text: 'Build landing page', quest: 'Launch Side Project', milestone: 'Build MVP', priority: 'high' as const },
+    { id: 8, text: 'Meal prep planning', quest: 'Health & Fitness', milestone: 'Build Routine', priority: 'medium' as const },
   ]);
 
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [showWeekOverview, setShowWeekOverview] = useState(false);
-  const [addingTaskForDay, setAddingTaskForDay] = useState<string | null>(null);
+  const [selectedMilestone, setSelectedMilestone] = useState<string | null>(null);
+  const [addingTaskForMilestone, setAddingTaskForMilestone] = useState<string | null>(null);
   const [newTaskText, setNewTaskText] = useState('');
   const [newTaskQuest, setNewTaskQuest] = useState('Launch Side Project');
   const [newTaskPriority, setNewTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
@@ -91,9 +81,9 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
     setEditingTaskId(null);
   };
 
-  const handleChangeDay = (taskId: number, newDay: string) => {
+  const handleChangeMilestone = (taskId: number, newMilestone: string) => {
     setTasks(tasks.map(t => 
-      t.id === taskId ? { ...t, day: newDay } : t
+      t.id === taskId ? { ...t, milestone: newMilestone } : t
     ));
   };
 
@@ -102,7 +92,7 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
     setEditText('');
   };
 
-  const handleAddTask = (day: string) => {
+  const handleAddTask = (milestone: string) => {
     if (!newTaskText.trim()) return;
     
     const newTask = {
@@ -110,19 +100,19 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
       text: newTaskText,
       quest: newTaskQuest,
       priority: newTaskPriority,
-      day: day
+      milestone: milestone
     };
     
     setTasks([...tasks, newTask]);
     setNewTaskText('');
     setNewTaskPriority('medium');
-    setAddingTaskForDay(null);
+    setAddingTaskForMilestone(null);
   };
 
   const handleCancelAddTask = () => {
     setNewTaskText('');
     setNewTaskPriority('medium');
-    setAddingTaskForDay(null);
+    setAddingTaskForMilestone(null);
   };
 
   const handleChangePriority = (taskId: number, newPriority: 'high' | 'medium' | 'low') => {
@@ -130,6 +120,9 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
       t.id === taskId ? { ...t, priority: newPriority } : t
     ));
   };
+
+  // Get unique milestones from tasks
+  const uniqueMilestones = Array.from(new Set(tasks.map(t => t.milestone)));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
@@ -202,7 +195,7 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
             ))}
           </div>
           
-          {/* Title with Animated Calendar Icon */}
+          {/* Title with Animated Icon */}
           <div className="flex items-center gap-3 mb-2 relative z-10">
             <motion.div 
               className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/30"
@@ -215,7 +208,7 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
                 repeat: Infinity,
               }}
             >
-              <Calendar className="w-6 h-6" />
+              <MapPin className="w-6 h-6" />
             </motion.div>
             <div>
               <motion.h2 
@@ -224,7 +217,7 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
               >
-                Weekly Review
+                Quest Review
               </motion.h2>
             </div>
           </div>
@@ -234,7 +227,7 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
           >
-            Let's reflect on your journey
+            Reflect on your progress and plan your next steps
           </motion.p>
 
           {/* Enhanced Step Indicator with Icons and Animated Progress */}
@@ -367,15 +360,15 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
             >
               <div>
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-2xl">This Week's Wins</h3>
-                  {onAskAIAboutWeek && (
+                  <h3 className="text-2xl">Your Progress</h3>
+                  {onAskAIAboutProgress && (
                     <Button 
                       variant="outline" 
-                      onClick={onAskAIAboutWeek}
+                      onClick={onAskAIAboutProgress}
                       className="gap-2 bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200 hover:from-indigo-100 hover:to-purple-100"
                     >
                       <Sparkles className="w-4 h-4 text-indigo-600" />
-                      Ask AI About This Week
+                      Ask AI About My Progress
                     </Button>
                   )}
                 </div>
@@ -391,20 +384,20 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
               </div>
 
               <div>
-                <h4 className="mb-4">Daily Activity</h4>
+                <h4 className="mb-4">Milestone Progress</h4>
                 <Card className="p-6 relative">
                   <ResponsiveContainer width="100%" height={250}>
                     <BarChart 
-                      data={weekData}
+                      data={milestoneData}
                       onMouseMove={(state) => {
                         if (state.isTooltipActive && state.activePayload) {
-                          setHoveredDay(state.activePayload[0].payload.day);
+                          setHoveredMilestone(state.activePayload[0].payload.name);
                         }
                       }}
-                      onMouseLeave={() => setHoveredDay(null)}
+                      onMouseLeave={() => setHoveredMilestone(null)}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis dataKey="day" stroke="#94a3b8" />
+                      <XAxis dataKey="name" stroke="#94a3b8" />
                       <YAxis stroke="#94a3b8" />
                       <Tooltip
                         contentStyle={{
@@ -417,19 +410,22 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
                             const data = payload[0].payload;
                             return (
                               <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-lg">
-                                <p className="font-medium mb-2">{data.fullDay}</p>
-                                <p className="text-sm text-slate-600 mb-3">
-                                  {data.tasks} tasks completed
+                                <p className="font-medium mb-2">{data.name}</p>
+                                <p className="text-sm text-slate-600 mb-1">
+                                  {data.progress}% complete
                                 </p>
-                                {onAskAIAboutDay && (
+                                <p className="text-xs text-slate-500 mb-3">
+                                  {data.tasks} tasks
+                                </p>
+                                {onAskAIAboutMilestone && (
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => onAskAIAboutDay(data.fullDay, data.tasks)}
+                                    onClick={() => onAskAIAboutMilestone(data.name)}
                                     className="w-full gap-2 text-xs bg-indigo-50 border-indigo-200 hover:bg-indigo-100"
                                   >
                                     <MessageCircle className="w-3 h-3" />
-                                    Ask AI About {data.day}
+                                    Ask AI About {data.name}
                                   </Button>
                                 )}
                               </div>
@@ -438,11 +434,11 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
                           return null;
                         }}
                       />
-                      <Bar dataKey="tasks" radius={[8, 8, 0, 0]}>
-                        {weekData.map((entry, index) => (
+                      <Bar dataKey="progress" radius={[8, 8, 0, 0]}>
+                        {milestoneData.map((entry, index) => (
                           <Cell 
                             key={`cell-${index}`} 
-                            fill={hoveredDay === entry.day ? '#6366f1' : '#4f46e5'} 
+                            fill={hoveredMilestone === entry.name ? '#6366f1' : '#4f46e5'} 
                             className="transition-all cursor-pointer"
                           />
                         ))}
@@ -450,7 +446,7 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
                     </BarChart>
                   </ResponsiveContainer>
                   <p className="text-xs text-slate-500 text-center mt-3">
-                    Hover over bars to ask AI about specific days
+                    Hover over bars to ask AI about specific milestones
                   </p>
                 </Card>
               </div>
@@ -476,24 +472,24 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
               <div>
                 <h3 className="text-2xl mb-6">Reflection</h3>
                 <p className="text-slate-600 mb-4">
-                  Take a moment to reflect on your week. What went well? What challenges did you face?
+                  Take a moment to reflect on your quest. What progress have you made? What obstacles did you overcome?
                 </p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block mb-2">What went well this week?</label>
+                  <label className="block mb-2">Which milestones made the most progress?</label>
                   <Textarea
-                    placeholder="I made consistent progress on my side project and felt energized by..."
+                    placeholder="I made great progress on the Design milestone by completing all wireframes and..."
                     rows={4}
                     className="w-full"
                   />
                 </div>
 
                 <div>
-                  <label className="block mb-2">What was challenging?</label>
+                  <label className="block mb-2">What obstacles did you overcome?</label>
                   <Textarea
-                    placeholder="I struggled with time management when..."
+                    placeholder="I struggled with authentication flow complexity, but found a solution by..."
                     rows={4}
                     className="w-full"
                     value={reflection}
@@ -502,9 +498,9 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
                 </div>
 
                 <div>
-                  <label className="block mb-2">What will you do differently?</label>
+                  <label className="block mb-2">What's your next focus area?</label>
                   <Textarea
-                    placeholder="Next week, I'll..."
+                    placeholder="I'll focus on completing the Build MVP milestone by..."
                     rows={4}
                     className="w-full"
                   />
@@ -539,110 +535,42 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-2xl mb-2">Plan for Next Week</h3>
+                  <h3 className="text-2xl mb-2">Plan Your Next Steps</h3>
                   <p className="text-slate-600">
-                    Organize your week by day. Click on days or tasks to get AI guidance.
+                    Organize tasks by milestone. Focus on what moves you forward.
                   </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={() => setShowWeekOverview(!showWeekOverview)}
-                    variant="outline"
-                    className="gap-2"
-                  >
-                    <List className="w-4 h-4" />
-                    {showWeekOverview ? 'Hide' : 'Show'} Week Overview
-                  </Button>
-                  {onAskAIAboutNextWeek && (
-                    <Button 
-                      onClick={onAskAIAboutNextWeek}
-                      className="gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      Ask AI
-                    </Button>
-                  )}
                 </div>
               </div>
 
-              {/* Week Overview - All Tasks by Day */}
-              {showWeekOverview && (
-                <Card className="p-6 bg-gradient-to-br from-slate-50 to-indigo-50 border-2 border-indigo-200">
-                  <h4 className="font-medium text-slate-800 mb-4 flex items-center gap-2">
-                    <List className="w-5 h-5 text-indigo-600" />
-                    Complete Week Overview
-                  </h4>
-                  <div className="grid grid-cols-7 gap-3">
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, idx) => {
-                      const dayTasks = tasks.filter(t => t.day === day);
-                      const isWeekend = idx >= 5;
-                      return (
-                        <div key={day} className="space-y-2">
-                          <div className={`text-sm font-medium pb-2 border-b-2 ${
-                            isWeekend ? 'text-amber-700 border-amber-400' : 'text-indigo-700 border-indigo-400'
-                          }`}>
-                            {day.slice(0, 3)}
-                          </div>
-                          <div className="space-y-1">
-                            {dayTasks.length > 0 ? (
-                              dayTasks.map(task => (
-                                <div key={task.id} className={`text-xs p-2 rounded ${
-                                  task.priority === 'high' ? 'bg-red-50 border-l-2 border-red-400' :
-                                  task.priority === 'medium' ? 'bg-yellow-50 border-l-2 border-yellow-400' :
-                                  'bg-blue-50 border-l-2 border-blue-400'
-                                }`}>
-                                  <div className="line-clamp-2">{task.text}</div>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="text-xs text-slate-400 italic">No tasks</div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Card>
-              )}
-
-              {/* Week Navigation - Quest Map Style */}
-              <div className="grid grid-cols-7 gap-3">
-                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, idx) => {
-                  const dayTasks = tasks.filter(t => t.day === day);
-                  const isWeekend = idx >= 5;
-                  const isSelected = selectedDay === day;
+              {/* Milestone Navigation */}
+              <div className="grid grid-cols-5 gap-3">
+                {uniqueMilestones.map((milestone, idx) => {
+                  const milestoneTasks = tasks.filter(t => t.milestone === milestone);
+                  const isSelected = selectedMilestone === milestone;
                   
                   return (
                     <Card 
-                      key={day}
-                      onClick={() => setSelectedDay(selectedDay === day ? null : day)}
+                      key={milestone}
+                      onClick={() => setSelectedMilestone(selectedMilestone === milestone ? null : milestone)}
                       className={`p-4 relative overflow-hidden group hover:shadow-xl transition-all cursor-pointer border-2 ${
                         isSelected
-                          ? isWeekend
-                            ? 'bg-gradient-to-br from-amber-100 to-orange-100 border-amber-500 ring-2 ring-amber-400'
-                            : 'bg-gradient-to-br from-indigo-100 to-blue-100 border-indigo-500 ring-2 ring-indigo-400'
-                          : isWeekend 
-                            ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 hover:border-amber-400' 
-                            : 'bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-200 hover:border-indigo-400'
+                          ? 'bg-gradient-to-br from-indigo-100 to-blue-100 border-indigo-500 ring-2 ring-indigo-400'
+                          : 'bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-200 hover:border-indigo-400'
                       }`}
                     >
-                      {/* Day Header */}
+                      {/* Milestone Header */}
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <div className="text-xs text-slate-500 mb-1">Day {idx + 1}</div>
-                          <div className={`font-medium ${isSelected ? 'text-lg' : ''}`}>{day.slice(0, 3)}</div>
+                          <div className="text-xs text-slate-500 mb-1">Step {idx + 1}</div>
+                          <div className={`font-medium text-sm ${isSelected ? 'text-base' : ''}`}>{milestone}</div>
                         </div>
-                        <Calendar className={`w-5 h-5 ${isWeekend ? 'text-amber-600' : 'text-indigo-600'}`} />
+                        <Flag className="w-5 h-5 text-indigo-600" />
                       </div>
 
                       {/* Task Count Badge */}
-                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs mb-3 ${
-                        isWeekend 
-                          ? 'bg-amber-100 text-amber-700' 
-                          : 'bg-indigo-100 text-indigo-700'
-                      }`}>
+                      <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs mb-3 bg-indigo-100 text-indigo-700">
                         <Target className="w-3 h-3" />
-                        {dayTasks.length} {dayTasks.length === 1 ? 'task' : 'tasks'}
+                        {milestoneTasks.length} {milestoneTasks.length === 1 ? 'task' : 'tasks'}
                       </div>
 
                       {/* Action Buttons */}
@@ -652,30 +580,22 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
                           variant="ghost"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setAddingTaskForDay(day);
+                            setAddingTaskForMilestone(milestone);
                           }}
-                          className={`flex-1 gap-1 text-xs ${
-                            isWeekend
-                              ? 'hover:bg-amber-100 text-amber-700'
-                              : 'hover:bg-indigo-100 text-indigo-700'
-                          }`}
+                          className="flex-1 gap-1 text-xs hover:bg-indigo-100 text-indigo-700"
                         >
                           <Plus className="w-3 h-3" />
                           Add
                         </Button>
-                        {onAskAIAboutPlanDay && (
+                        {onAskAIAboutMilestone && (
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onAskAIAboutPlanDay(day);
+                              onAskAIAboutMilestone(milestone);
                             }}
-                            className={`flex-1 gap-1 text-xs ${
-                              isWeekend
-                                ? 'hover:bg-amber-100 text-amber-700'
-                                : 'hover:bg-indigo-100 text-indigo-700'
-                            }`}
+                            className="flex-1 gap-1 text-xs hover:bg-indigo-100 text-indigo-700"
                           >
                             <MessageCircle className="w-3 h-3" />
                             AI
@@ -685,25 +605,21 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
 
                       {/* Selected Indicator */}
                       {isSelected && (
-                        <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full ${
-                          isWeekend ? 'bg-amber-600' : 'bg-indigo-600'
-                        }`} />
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-indigo-600" />
                       )}
 
                       {/* Decorative Corner */}
-                      <div className={`absolute top-0 right-0 w-12 h-12 ${
-                        isWeekend ? 'bg-amber-200/30' : 'bg-indigo-200/30'
-                      } rounded-bl-full -mr-4 -mt-4`} />
+                      <div className="absolute top-0 right-0 w-12 h-12 bg-indigo-200/30 rounded-bl-full -mr-4 -mt-4" />
                     </Card>
                   );
                 })}
               </div>
 
               {/* Add Task Form */}
-              {addingTaskForDay && (
+              {addingTaskForMilestone && (
                 <Card className="p-4 bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-300">
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-indigo-900">Add Task for {addingTaskForDay}</h4>
+                    <h4 className="font-medium text-indigo-900">Add Task for {addingTaskForMilestone}</h4>
                     <Button
                       size="sm"
                       variant="ghost"
@@ -722,7 +638,7 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
                       autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
-                          handleAddTask(addingTaskForDay);
+                          handleAddTask(addingTaskForMilestone);
                         }
                       }}
                     />
@@ -749,7 +665,7 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
                       </Select>
                     </div>
                     <Button
-                      onClick={() => handleAddTask(addingTaskForDay)}
+                      onClick={() => handleAddTask(addingTaskForMilestone)}
                       className="w-full bg-indigo-600 hover:bg-indigo-700"
                       disabled={!newTaskText.trim()}
                     >
@@ -760,27 +676,27 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
                 </Card>
               )}
 
-              {/* Tasks List - Filtered by Selected Day */}
+              {/* Tasks List - Filtered by Selected Milestone */}
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <h4 className="font-medium text-slate-700">
-                      {selectedDay ? `Tasks for ${selectedDay}` : 'All Tasks for Next Week'}
+                      {selectedMilestone ? `Tasks for ${selectedMilestone}` : 'All Tasks'}
                     </h4>
-                    {selectedDay && (
+                    {selectedMilestone && (
                       <Badge 
                         variant="secondary" 
                         className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 cursor-pointer"
-                        onClick={() => setSelectedDay(null)}
+                        onClick={() => setSelectedMilestone(null)}
                       >
-                        {selectedDay.slice(0, 3)} • Click to clear
+                        {selectedMilestone} • Click to clear
                       </Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-slate-500">
-                      {selectedDay 
-                        ? `${tasks.filter(t => t.day === selectedDay).length} tasks` 
+                      {selectedMilestone 
+                        ? `${tasks.filter(t => t.milestone === selectedMilestone).length} tasks` 
                         : `${tasks.length} tasks planned`
                       }
                     </span>
@@ -788,7 +704,7 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
                 </div>
 
                 <div className="space-y-2">
-                  {(selectedDay ? tasks.filter(t => t.day === selectedDay) : tasks).map((task, idx) => (
+                  {(selectedMilestone ? tasks.filter(t => t.milestone === selectedMilestone) : tasks).map((task, idx) => (
                     <Card
                       key={task.id}
                       className="p-4 hover:shadow-md transition-all group border-l-4"
@@ -856,27 +772,27 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
                                     {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
                                   </span>
                                   <span className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded flex items-center gap-1">
-                                    <Calendar className="w-3 h-3" />
-                                    {task.day}
+                                    <Flag className="w-3 h-3" />
+                                    {task.milestone}
                                   </span>
                                 </div>
                               </div>
 
                               <div className="flex gap-2">
-                                {/* Day Selector */}
+                                {/* Milestone Selector */}
                                 <Select
-                                  value={task.day}
+                                  value={task.milestone}
                                   onValueChange={(value: string) => 
-                                    handleChangeDay(task.id, value)
+                                    handleChangeMilestone(task.id, value)
                                   }
                                 >
-                                  <SelectTrigger className="w-24 h-8 text-xs">
+                                  <SelectTrigger className="w-32 h-8 text-xs">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                                      <SelectItem key={day} value={day} className="text-xs">
-                                        {day.slice(0, 3)}
+                                    {uniqueMilestones.map(milestone => (
+                                      <SelectItem key={milestone} value={milestone} className="text-xs">
+                                        {milestone}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
@@ -945,15 +861,15 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
                     </Card>
                   ))}
                   
-                  {(selectedDay ? tasks.filter(t => t.day === selectedDay) : tasks).length === 0 && (
+                  {(selectedMilestone ? tasks.filter(t => t.milestone === selectedMilestone) : tasks).length === 0 && (
                     <Card className="p-8 text-center">
                       <Target className="w-12 h-12 mx-auto mb-3 text-slate-300" />
                       <p className="text-slate-500 mb-1">
-                        {selectedDay ? `No tasks planned for ${selectedDay}` : 'No tasks planned yet'}
+                        {selectedMilestone ? `No tasks for ${selectedMilestone}` : 'No tasks planned yet'}
                       </p>
                       <p className="text-sm text-slate-400">
-                        {selectedDay 
-                          ? 'Click on a different day or clear the filter to see all tasks' 
+                        {selectedMilestone 
+                          ? 'Click "Add" to create tasks for this milestone' 
                           : 'Tasks you create will appear here'
                         }
                       </p>
@@ -977,7 +893,7 @@ export function WeeklyReview({ onClose, onAskAIAboutWeek, onAskAIAboutDay, onAsk
                   className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 px-8 shadow-lg"
                 >
                   <Trophy className="w-4 h-4 mr-2" />
-                  Commit to My Week ({tasks.length} {tasks.length === 1 ? 'task' : 'tasks'})
+                  Commit to My Plan ({tasks.length} {tasks.length === 1 ? 'task' : 'tasks'})
                 </Button>
               </div>
             </motion.div>

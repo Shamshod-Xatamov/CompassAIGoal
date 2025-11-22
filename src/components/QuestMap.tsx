@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { 
   CheckCircle2, Circle, MapPin, X, Calendar, Target, Trophy, Sparkles, Star, Flag, 
-  Edit2, Trash2, Plus, GripVertical, Check, XCircle, MessageCircle
+  Edit2, Trash2, Plus, GripVertical, Check, XCircle, MessageCircle, User, ChevronRight,
+  SkipForward, Snowflake, Pause
 } from 'lucide-react';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
@@ -14,6 +15,16 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from './ui/accordion';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 
 interface Task {
   id: string;
@@ -22,264 +33,756 @@ interface Task {
   priority: 'high' | 'medium' | 'low';
 }
 
-interface DayPlan {
-  [key: string]: Task[];
+interface SubGoal {
+  id: string;
+  title: string;
+  completed: boolean;
+  side: 'left' | 'right';
+  tasks: Task[];
+}
+
+interface Milestone {
+  id: string;
+  title: string;
+  completed: boolean;
+  isCurrent: boolean;
+  status?: 'active' | 'skipped' | 'frozen';
+  tasks: Task[];
+  subGoals: SubGoal[];
+  y: number;
 }
 
 interface QuestMapProps {
   quest: any;
-  onAskAI?: (taskText: string, questName: string, dayOfWeek: string) => void;
+  onAskAI?: (taskText: string, questName: string, context: string) => void;
+  onQuestComplete?: (questId: string) => void;
+  onConfirmQuest?: (questId: string) => void;
+  onRegenerateQuest?: () => void;
 }
 
-export function QuestMap({ quest, onAskAI }: QuestMapProps) {
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [editingTask, setEditingTask] = useState<{ day: string; taskId: string } | null>(null);
+export function QuestMap({ quest, onAskAI, onQuestComplete, onConfirmQuest, onRegenerateQuest }: QuestMapProps) {
+  const [selectedMilestone, setSelectedMilestone] = useState<string | null>(null);
+  const [selectedSubGoal, setSelectedSubGoal] = useState<{ milestoneId: string; subGoalId: string } | null>(null);
+  const [editingTask, setEditingTask] = useState<{ parentId: string; taskId: string } | null>(null);
   const [editText, setEditText] = useState('');
-  const [currentDayAccordion, setCurrentDayAccordion] = useState<string[]>([]);
+  const [editingSubGoal, setEditingSubGoal] = useState<{ milestoneId: string; subGoalId: string } | null>(null);
+  const [editSubGoalText, setEditSubGoalText] = useState('');
+  const [editingMilestone, setEditingMilestone] = useState<string | null>(null);
+  const [editMilestoneText, setEditMilestoneText] = useState('');
+  const [celebrationDismissed, setCelebrationDismissed] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    type: 'milestone' | 'subgoal' | 'task';
+    id: string;
+    parentId?: string;
+    title: string;
+  } | null>(null);
 
-  // Generate weeks data (4 weeks per milestone)
-  const totalWeeks = quest.milestones.length * 4;
-  const currentWeek = Math.floor((quest.progress / 100) * totalWeeks);
+  // Generate roadmap structure from milestones
+  const generateRoadmapStructure = (): Milestone[] => {
+    const totalMilestones = quest.milestones.length;
+    const completedCount = Math.floor((quest.progress / 100) * totalMilestones);
 
-  // Initialize tasks state with priorities
-  const [weekTasks, setWeekTasks] = useState<{ [weekIndex: number]: DayPlan }>({});
+    return quest.milestones.map((milestone: string, index: number) => {
+      const isCompleted = index < completedCount;
+      const isCurrent = index === completedCount;
+      
+      // Vertical spacing - evenly distributed
+      const y = 15 + (index / (totalMilestones - 1)) * 70;
 
-  const weeks = Array.from({ length: totalWeeks }, (_, i) => {
-    const weekNumber = i + 1;
-    const milestoneIndex = Math.floor(i / 4);
-    const isComplete = i < currentWeek;
-    const isCurrent = i === currentWeek;
-    const weekPart = (i % 4) + 1;
+      // Generate sub-goals that branch off with their own tasks
+      const subGoals: SubGoal[] = [
+        {
+          id: `${index}-sub-1`,
+          title: `Learn Fundamentals`,
+          completed: isCompleted,
+          side: 'right',
+          tasks: [
+            {
+              id: `${index}-sub-1-task-1`,
+              text: `Study core concepts of ${milestone}`,
+              completed: isCompleted,
+              priority: 'high'
+            },
+            {
+              id: `${index}-sub-1-task-2`,
+              text: `Watch tutorial videos`,
+              completed: isCompleted,
+              priority: 'medium'
+            },
+            {
+              id: `${index}-sub-1-task-3`,
+              text: `Take notes and create summary`,
+              completed: isCompleted,
+              priority: 'low'
+            }
+          ]
+        },
+        {
+          id: `${index}-sub-2`,
+          title: `Practice & Apply`,
+          completed: isCompleted,
+          side: 'right',
+          tasks: [
+            {
+              id: `${index}-sub-2-task-1`,
+              text: `Complete practice exercises`,
+              completed: isCompleted,
+              priority: 'high'
+            },
+            {
+              id: `${index}-sub-2-task-2`,
+              text: `Work on coding challenges`,
+              completed: isCompleted,
+              priority: 'medium'
+            },
+            {
+              id: `${index}-sub-2-task-3`,
+              text: `Review and debug solutions`,
+              completed: isCompleted,
+              priority: 'low'
+            }
+          ]
+        },
+        {
+          id: `${index}-sub-3`,
+          title: `Build Project`,
+          completed: isCompleted,
+          side: 'right',
+          tasks: [
+            {
+              id: `${index}-sub-3-task-1`,
+              text: `Plan project structure`,
+              completed: isCompleted,
+              priority: 'high'
+            },
+            {
+              id: `${index}-sub-3-task-2`,
+              text: `Implement core features`,
+              completed: isCompleted,
+              priority: 'high'
+            },
+            {
+              id: `${index}-sub-3-task-3`,
+              text: `Test and deploy project`,
+              completed: isCompleted,
+              priority: 'medium'
+            }
+          ]
+        }
+      ];
 
-    // Initialize tasks for this week if not already done
-    if (!weekTasks[i]) {
-      const createTasks = (tasks: string[], startPriority: 'high' | 'medium' | 'low' = 'medium'): Task[] => {
-        return tasks.map((text, idx) => ({
-          id: `${i}-${text}-${idx}`,
-          text,
-          completed: isComplete,
-          priority: idx === 0 ? 'high' : startPriority
-        }));
+      // Generate tasks for the milestone itself
+      const tasks: Task[] = [
+        {
+          id: `${index}-task-1`,
+          text: `Complete: ${milestone}`,
+          completed: isCompleted,
+          priority: 'high'
+        },
+        {
+          id: `${index}-task-2`,
+          text: `Review progress and document learnings`,
+          completed: isCompleted,
+          priority: 'medium'
+        },
+        {
+          id: `${index}-task-3`,
+          text: `Share insights with community`,
+          completed: isCompleted,
+          priority: 'low'
+        }
+      ];
+
+      return {
+        id: `milestone-${index}`,
+        title: milestone,
+        completed: isCompleted,
+        isCurrent,
+        tasks,
+        subGoals,
+        y
       };
+    });
+  };
 
-      weekTasks[i] = {
-        monday: createTasks([
-          `Start: ${quest.milestones[milestoneIndex]} (Part ${weekPart})`,
-          `Morning review and planning session`,
-          `Practice core habits (30 min)`
-        ]),
-        tuesday: createTasks([
-          `Deep work: ${quest.milestones[milestoneIndex]}`,
-          `Track progress and metrics`,
-          `Evening reflection (15 min)`
-        ]),
-        wednesday: createTasks([
-          `Continue ${quest.milestones[milestoneIndex]} work`,
-          `Mid-week checkpoint review`,
-          `Adjust approach if needed`
-        ]),
-        thursday: createTasks([
-          `Focus session: Key deliverable`,
-          `Practice related skills`,
-          `Review learnings so far`
-        ]),
-        friday: createTasks([
-          `Complete week's main objective`,
-          `Document insights and wins`,
-          `Prepare for next week`
-        ]),
-        saturday: createTasks([
-          `Light work or catch-up time`,
-          `Review weekly progress`,
-          `Optional: Explore related topics`
-        ]),
-        sunday: createTasks([
-          `Rest and recharge`,
-          `Weekly reflection ritual`,
-          `Set intentions for next week`
-        ])
-      };
-    }
+  const [milestones, setMilestones] = useState<Milestone[]>(generateRoadmapStructure());
 
-    return {
-      week: weekNumber,
-      milestone: quest.milestones[milestoneIndex],
-      isComplete,
-      isCurrent,
-      dailyPlan: weekTasks[i] || {}
-    };
-  });
-
-  // Auto-open current day when modal opens
+  // Reset milestones when quest changes
   useEffect(() => {
-    if (selectedWeek !== null && weeks[selectedWeek]?.isCurrent) {
-      const today = new Date().getDay();
-      const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-      setCurrentDayAccordion([days[today]]);
-    } else {
-      setCurrentDayAccordion([]);
-    }
-  }, [selectedWeek]);
+    setMilestones(generateRoadmapStructure());
+    setSelectedMilestone(null);
+    setSelectedSubGoal(null);
+    setEditingTask(null);
+    setEditingSubGoal(null);
+    setEditingMilestone(null);
+    setCelebrationDismissed(false);
+    setDeleteConfirmation(null);
+  }, [quest.id]);
 
-  // Task management functions
-  const toggleTaskComplete = (weekIndex: number, day: string, taskId: string) => {
-    setWeekTasks(prev => ({
-      ...prev,
-      [weekIndex]: {
-        ...prev[weekIndex],
-        [day]: prev[weekIndex][day].map(task =>
+  // Task management functions for milestones
+  const toggleTaskComplete = (milestoneId: string, taskId: string) => {
+    setMilestones(prev => prev.map(m => {
+      if (m.id === milestoneId) {
+        const updatedTasks = m.tasks.map(task =>
           task.id === taskId ? { ...task, completed: !task.completed } : task
-        )
+        );
+        const allTasksComplete = updatedTasks.every(t => t.completed);
+        const allSubGoalsComplete = m.subGoals.every(sg => sg.completed);
+        const allComplete = allTasksComplete && allSubGoalsComplete;
+        return { ...m, tasks: updatedTasks, completed: allComplete };
       }
+      return m;
+    }).map((m, index, array) => {
+      // Recalculate isCurrent for each milestone based on completion status
+      // Find the first incomplete milestone (excluding skipped ones)
+      const firstIncompleteIndex = array.findIndex(milestone => !milestone.completed && milestone.status !== 'skipped');
+      return {
+        ...m,
+        isCurrent: index === firstIncompleteIndex && firstIncompleteIndex !== -1
+      };
     }));
   };
 
-  const startEditTask = (day: string, taskId: string, currentText: string) => {
-    setEditingTask({ day, taskId });
+  // Task management functions for subgoals
+  const toggleSubGoalTaskComplete = (milestoneId: string, subGoalId: string, taskId: string) => {
+    setMilestones(prev => prev.map(m => {
+      if (m.id === milestoneId) {
+        const updatedSubGoals = m.subGoals.map(sg => {
+          if (sg.id === subGoalId) {
+            const updatedTasks = sg.tasks.map(task =>
+              task.id === taskId ? { ...task, completed: !task.completed } : task
+            );
+            const allComplete = updatedTasks.every(t => t.completed);
+            return { ...sg, tasks: updatedTasks, completed: allComplete };
+          }
+          return sg;
+        });
+        
+        // Update milestone completion based on all subgoals AND milestone tasks
+        const allSubGoalsComplete = updatedSubGoals.every(sg => sg.completed);
+        const allTasksComplete = m.tasks.every(t => t.completed);
+        const allComplete = allSubGoalsComplete && allTasksComplete;
+        
+        return { ...m, subGoals: updatedSubGoals, completed: allComplete };
+      }
+      return m;
+    }).map((m, index, array) => {
+      // Recalculate isCurrent for each milestone based on completion status
+      // Find the first incomplete milestone (excluding skipped ones)
+      const firstIncompleteIndex = array.findIndex(milestone => !milestone.completed && milestone.status !== 'skipped');
+      return {
+        ...m,
+        isCurrent: index === firstIncompleteIndex && firstIncompleteIndex !== -1
+      };
+    }));
+  };
+
+  const startEditTask = (parentId: string, taskId: string, currentText: string) => {
+    setEditingTask({ parentId, taskId });
     setEditText(currentText);
   };
 
-  const saveEditTask = (weekIndex: number, day: string, taskId: string) => {
+  const saveEditTask = (parentId: string, taskId: string, isSubGoal: boolean = false) => {
     if (editText.trim()) {
-      setWeekTasks(prev => ({
-        ...prev,
-        [weekIndex]: {
-          ...prev[weekIndex],
-          [day]: prev[weekIndex][day].map(task =>
-            task.id === taskId ? { ...task, text: editText.trim() } : task
-          )
-        }
-      }));
+      if (isSubGoal && selectedSubGoal) {
+        setMilestones(prev => prev.map(m =>
+          m.id === selectedSubGoal.milestoneId ? {
+            ...m,
+            subGoals: m.subGoals.map(sg =>
+              sg.id === selectedSubGoal.subGoalId ? {
+                ...sg,
+                tasks: sg.tasks.map(task =>
+                  task.id === taskId ? { ...task, text: editText.trim() } : task
+                )
+              } : sg
+            )
+          } : m
+        ));
+      } else {
+        setMilestones(prev => prev.map(m =>
+          m.id === parentId ? {
+            ...m,
+            tasks: m.tasks.map(task =>
+              task.id === taskId ? { ...task, text: editText.trim() } : task
+            )
+          } : m
+        ));
+      }
     }
     setEditingTask(null);
     setEditText('');
   };
 
-  const deleteTask = (weekIndex: number, day: string, taskId: string) => {
-    setWeekTasks(prev => ({
-      ...prev,
-      [weekIndex]: {
-        ...prev[weekIndex],
-        [day]: prev[weekIndex][day].filter(task => task.id !== taskId)
-      }
-    }));
+  const deleteTask = (parentId: string, taskId: string, isSubGoal: boolean = false) => {
+    let taskTitle = '';
+    if (isSubGoal && selectedSubGoal) {
+      const milestone = milestones.find(m => m.id === selectedSubGoal.milestoneId);
+      const subGoal = milestone?.subGoals.find(sg => sg.id === selectedSubGoal.subGoalId);
+      const task = subGoal?.tasks.find(t => t.id === taskId);
+      taskTitle = task?.text || '';
+    } else {
+      const milestone = milestones.find(m => m.id === parentId);
+      const task = milestone?.tasks.find(t => t.id === taskId);
+      taskTitle = task?.text || '';
+    }
+    
+    setDeleteConfirmation({
+      type: 'task',
+      id: taskId,
+      parentId: parentId,
+      title: taskTitle
+    });
   };
 
-  const addNewTask = (weekIndex: number, day: string) => {
+  const confirmDeleteTask = (parentId: string, taskId: string, isSubGoal: boolean = false) => {
+    if (isSubGoal && selectedSubGoal) {
+      setMilestones(prev => prev.map(m => {
+        if (m.id === selectedSubGoal.milestoneId) {
+          const updatedSubGoals = m.subGoals.map(sg => {
+            if (sg.id === selectedSubGoal.subGoalId) {
+              const updatedTasks = sg.tasks.filter(task => task.id !== taskId);
+              const allComplete = updatedTasks.every(t => t.completed);
+              return { ...sg, tasks: updatedTasks, completed: allComplete };
+            }
+            return sg;
+          });
+          
+          // Update milestone completion based on all subgoals AND milestone tasks
+          const allSubGoalsComplete = updatedSubGoals.every(sg => sg.completed);
+          const allTasksComplete = m.tasks.every(t => t.completed);
+          const allComplete = allSubGoalsComplete && allTasksComplete;
+          
+          return { ...m, subGoals: updatedSubGoals, completed: allComplete };
+        }
+        return m;
+      }).map((m, index, array) => {
+        // Recalculate isCurrent for each milestone
+        const firstIncompleteIndex = array.findIndex(milestone => !milestone.completed && milestone.status !== 'skipped');
+        return {
+          ...m,
+          isCurrent: index === firstIncompleteIndex && firstIncompleteIndex !== -1
+        };
+      }));
+    } else {
+      setMilestones(prev => prev.map(m => {
+        if (m.id === parentId) {
+          const updatedTasks = m.tasks.filter(task => task.id !== taskId);
+          const allTasksComplete = updatedTasks.every(t => t.completed);
+          const allSubGoalsComplete = m.subGoals.every(sg => sg.completed);
+          const allComplete = allTasksComplete && allSubGoalsComplete;
+          return { ...m, tasks: updatedTasks, completed: allComplete };
+        }
+        return m;
+      }).map((m, index, array) => {
+        // Recalculate isCurrent for each milestone
+        const firstIncompleteIndex = array.findIndex(milestone => !milestone.completed && milestone.status !== 'skipped');
+        return {
+          ...m,
+          isCurrent: index === firstIncompleteIndex && firstIncompleteIndex !== -1
+        };
+      }));
+    }
+    setDeleteConfirmation(null);
+  };
+
+  const addNewTask = (parentId: string, isSubGoal: boolean = false) => {
     const newTask: Task = {
-      id: `${weekIndex}-${day}-${Date.now()}`,
+      id: `${parentId}-${Date.now()}`,
       text: 'New task',
       completed: false,
       priority: 'medium'
     };
-    setWeekTasks(prev => ({
-      ...prev,
-      [weekIndex]: {
-        ...prev[weekIndex],
-        [day]: [...prev[weekIndex][day], newTask]
-      }
-    }));
-    // Auto-start editing the new task
-    startEditTask(day, newTask.id, newTask.text);
-  };
-
-  const changePriority = (weekIndex: number, day: string, taskId: string) => {
-    setWeekTasks(prev => ({
-      ...prev,
-      [weekIndex]: {
-        ...prev[weekIndex],
-        [day]: prev[weekIndex][day].map(task => {
-          if (task.id === taskId) {
-            const priorities: Array<'high' | 'medium' | 'low'> = ['high', 'medium', 'low'];
-            const currentIndex = priorities.indexOf(task.priority);
-            const nextPriority = priorities[(currentIndex + 1) % 3];
-            return { ...task, priority: nextPriority };
-          }
-          return task;
-        })
-      }
-    }));
-  };
-
-  const reorderTasks = (weekIndex: number, day: string, newOrder: Task[]) => {
-    setWeekTasks(prev => ({
-      ...prev,
-      [weekIndex]: {
-        ...prev[weekIndex],
-        [day]: newOrder
-      }
-    }));
-  };
-
-  // Dynamic height calculation - more compact with more weeks
-  const baseHeight = 600;
-  const heightPerWeek = Math.max(30, 80 - totalWeeks * 2);
-  const containerHeight = Math.min(900, baseHeight + (totalWeeks * heightPerWeek));
-
-  // Create organic path points - path goes THROUGH each circle
-  const pathPoints = weeks.map((_, index) => {
-    const progress = index / (totalWeeks - 1);
     
-    // Vertical - bottom to top with dynamic spacing
-    const y = 88 - (progress * 78);
-    
-    // Horizontal - forest path meandering
-    const baseX = 50;
-    const wave1 = Math.sin(progress * Math.PI * 2.8) * 28;
-    const wave2 = Math.sin(progress * Math.PI * 4.5 + 0.8) * 12;
-    const wave3 = Math.cos(progress * Math.PI * 6.2 + 1.5) * 6;
-    
-    const x = baseX + wave1 + wave2 + wave3;
-
-    return { x, y };
-  });
-
-  // Create smooth path that goes THROUGH all points
-  const createPathThroughPoints = (points: { x: number; y: number }[]) => {
-    if (points.length < 2) return '';
-    
-    let path = `M ${points[0].x},${points[0].y}`;
-    
-    for (let i = 0; i < points.length - 1; i++) {
-      const current = points[i];
-      const next = points[i + 1];
-      
-      const prev = i > 0 ? points[i - 1] : current;
-      const afterNext = i < points.length - 2 ? points[i + 2] : next;
-      
-      const cp1x = current.x + (next.x - prev.x) * 0.25;
-      const cp1y = current.y + (next.y - prev.y) * 0.25;
-      const cp2x = next.x - (afterNext.x - current.x) * 0.25;
-      const cp2y = next.y - (afterNext.y - current.y) * 0.25;
-      
-      path += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${next.x},${next.y}`;
+    if (isSubGoal && selectedSubGoal) {
+      setMilestones(prev => prev.map(m =>
+        m.id === selectedSubGoal.milestoneId ? {
+          ...m,
+          subGoals: m.subGoals.map(sg =>
+            sg.id === selectedSubGoal.subGoalId ? {
+              ...sg,
+              tasks: [...sg.tasks, newTask]
+            } : sg
+          )
+        } : m
+      ));
+    } else {
+      setMilestones(prev => prev.map(m =>
+        m.id === parentId ? {
+          ...m,
+          tasks: [...m.tasks, newTask]
+        } : m
+      ));
     }
+    startEditTask(parentId, newTask.id, newTask.text);
+  };
+
+  const changePriority = (parentId: string, taskId: string, isSubGoal: boolean = false) => {
+    const priorities: Array<'high' | 'medium' | 'low'> = ['high', 'medium', 'low'];
     
-    return path;
+    if (isSubGoal && selectedSubGoal) {
+      setMilestones(prev => prev.map(m => {
+        if (m.id === selectedSubGoal.milestoneId) {
+          return {
+            ...m,
+            subGoals: m.subGoals.map(sg => {
+              if (sg.id === selectedSubGoal.subGoalId) {
+                return {
+                  ...sg,
+                  tasks: sg.tasks.map(task => {
+                    if (task.id === taskId) {
+                      const currentIndex = priorities.indexOf(task.priority);
+                      const nextPriority = priorities[(currentIndex + 1) % 3];
+                      return { ...task, priority: nextPriority };
+                    }
+                    return task;
+                  })
+                };
+              }
+              return sg;
+            })
+          };
+        }
+        return m;
+      }));
+    } else {
+      setMilestones(prev => prev.map(m => {
+        if (m.id === parentId) {
+          return {
+            ...m,
+            tasks: m.tasks.map(task => {
+              if (task.id === taskId) {
+                const currentIndex = priorities.indexOf(task.priority);
+                const nextPriority = priorities[(currentIndex + 1) % 3];
+                return { ...task, priority: nextPriority };
+              }
+              return task;
+            })
+          };
+        }
+        return m;
+      }));
+    }
   };
 
-  const fullPathString = createPathThroughPoints(pathPoints);
-  const progressPathString = createPathThroughPoints(pathPoints.slice(0, currentWeek + 1));
-
-  // Mouse drag handlers
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  const reorderTasks = (parentId: string, newOrder: Task[], isSubGoal: boolean = false) => {
+    if (isSubGoal && selectedSubGoal) {
+      setMilestones(prev => prev.map(m =>
+        m.id === selectedSubGoal.milestoneId ? {
+          ...m,
+          subGoals: m.subGoals.map(sg =>
+            sg.id === selectedSubGoal.subGoalId ? { ...sg, tasks: newOrder } : sg
+          )
+        } : m
+      ));
+    } else {
+      setMilestones(prev => prev.map(m =>
+        m.id === parentId ? { ...m, tasks: newOrder } : m
+      ));
+    }
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    setPan({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y
+  // SubGoal management functions
+  const addNewSubGoal = (milestoneId: string) => {
+    const newSubGoal: SubGoal = {
+      id: `${milestoneId}-sub-${Date.now()}`,
+      title: 'New Subgoal',
+      completed: false,
+      side: 'right',
+      tasks: [
+        {
+          id: `${milestoneId}-sub-${Date.now()}-task-1`,
+          text: 'First task',
+          completed: false,
+          priority: 'medium'
+        }
+      ]
+    };
+    
+    setMilestones(prev => prev.map(m => {
+      if (m.id === milestoneId) {
+        const updatedSubGoals = [...m.subGoals, newSubGoal];
+        // Recalculate milestone completion - adding incomplete subgoal makes milestone incomplete
+        const allSubGoalsComplete = updatedSubGoals.every(sg => sg.completed);
+        const allTasksComplete = m.tasks.every(t => t.completed);
+        const allComplete = allSubGoalsComplete && allTasksComplete;
+        return { ...m, subGoals: updatedSubGoals, completed: allComplete };
+      }
+      return m;
+    }).map((m, index, array) => {
+      // Recalculate isCurrent for each milestone
+      const firstIncompleteIndex = array.findIndex(milestone => !milestone.completed && milestone.status !== 'skipped');
+      return {
+        ...m,
+        isCurrent: index === firstIncompleteIndex && firstIncompleteIndex !== -1
+      };
+    }));
+    
+    // Auto-edit the new subgoal
+    setEditingSubGoal({ milestoneId, subGoalId: newSubGoal.id });
+    setEditSubGoalText(newSubGoal.title);
+  };
+
+  const startEditSubGoal = (milestoneId: string, subGoalId: string, currentTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSubGoal({ milestoneId, subGoalId });
+    setEditSubGoalText(currentTitle);
+  };
+
+  const saveEditSubGoal = (milestoneId: string, subGoalId: string) => {
+    if (editSubGoalText.trim()) {
+      setMilestones(prev => prev.map(m =>
+        m.id === milestoneId ? {
+          ...m,
+          subGoals: m.subGoals.map(sg =>
+            sg.id === subGoalId ? { ...sg, title: editSubGoalText.trim() } : sg
+          )
+        } : m
+      ));
+    }
+    setEditingSubGoal(null);
+    setEditSubGoalText('');
+  };
+
+  const deleteSubGoal = (milestoneId: string, subGoalId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const milestone = milestones.find(m => m.id === milestoneId);
+    const subGoal = milestone?.subGoals.find(sg => sg.id === subGoalId);
+    if (subGoal) {
+      setDeleteConfirmation({
+        type: 'subgoal',
+        id: subGoalId,
+        parentId: milestoneId,
+        title: subGoal.title
+      });
+    }
+  };
+
+  const confirmDeleteSubGoal = (milestoneId: string, subGoalId: string) => {
+    setMilestones(prev => prev.map(m => {
+      if (m.id === milestoneId) {
+        const updatedSubGoals = m.subGoals.filter(sg => sg.id !== subGoalId);
+        // Update milestone completion based on remaining subgoals AND milestone tasks
+        const allSubGoalsComplete = updatedSubGoals.every(sg => sg.completed);
+        const allTasksComplete = m.tasks.every(t => t.completed);
+        const allComplete = allSubGoalsComplete && allTasksComplete;
+        return { ...m, subGoals: updatedSubGoals, completed: allComplete };
+      }
+      return m;
+    }).map((m, index, array) => {
+      // Recalculate isCurrent for each milestone
+      const firstIncompleteIndex = array.findIndex(milestone => !milestone.completed && milestone.status !== 'skipped');
+      return {
+        ...m,
+        isCurrent: index === firstIncompleteIndex && firstIncompleteIndex !== -1
+      };
+    }));
+    setDeleteConfirmation(null);
+  };
+
+  // Milestone management functions
+  const startEditMilestone = (milestoneId: string, currentTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingMilestone(milestoneId);
+    setEditMilestoneText(currentTitle);
+  };
+
+  const saveEditMilestone = (milestoneId: string) => {
+    if (editMilestoneText.trim()) {
+      setMilestones(prev => prev.map(m =>
+        m.id === milestoneId ? { ...m, title: editMilestoneText.trim() } : m
+      ));
+    }
+    setEditingMilestone(null);
+    setEditMilestoneText('');
+  };
+
+  const deleteMilestone = (milestoneId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const milestone = milestones.find(m => m.id === milestoneId);
+    if (milestone) {
+      setDeleteConfirmation({
+        type: 'milestone',
+        id: milestoneId,
+        title: milestone.title
+      });
+    }
+  };
+
+  const confirmDeleteMilestone = (milestoneId: string) => {
+    setMilestones(prev => {
+      const filtered = prev.filter(m => m.id !== milestoneId);
+      
+      // Recalculate isCurrent for remaining milestones
+      return filtered.map((m, index, array) => {
+        const firstIncompleteIndex = array.findIndex(milestone => !milestone.completed && milestone.status !== 'skipped');
+        return {
+          ...m,
+          isCurrent: index === firstIncompleteIndex && firstIncompleteIndex !== -1
+        };
+      });
+    });
+    setDeleteConfirmation(null);
+  };
+
+  const addMilestoneAfter = (afterIndex: number) => {
+    const newMilestone: Milestone = {
+      id: `milestone-${Date.now()}`,
+      title: 'New Milestone',
+      completed: false,
+      isCurrent: false,
+      tasks: [
+        {
+          id: `milestone-${Date.now()}-task-1`,
+          text: 'First task',
+          completed: false,
+          priority: 'medium'
+        }
+      ],
+      subGoals: [
+        {
+          id: `milestone-${Date.now()}-sub-1`,
+          title: 'New Subgoal',
+          completed: false,
+          side: 'right',
+          tasks: [
+            {
+              id: `milestone-${Date.now()}-sub-1-task-1`,
+              text: 'First subtask',
+              completed: false,
+              priority: 'medium'
+            }
+          ]
+        }
+      ],
+      y: 0
+    };
+
+    setMilestones(prev => {
+      const newMilestones = [...prev];
+      newMilestones.splice(afterIndex + 1, 0, newMilestone);
+      
+      // Recalculate y positions and isCurrent
+      const totalMilestones = newMilestones.length;
+      return newMilestones.map((m, idx, array) => {
+        const firstIncompleteIndex = array.findIndex(milestone => !milestone.completed && milestone.status !== 'skipped');
+        return {
+          ...m,
+          y: 15 + (idx / (totalMilestones - 1)) * 70,
+          isCurrent: idx === firstIncompleteIndex && firstIncompleteIndex !== -1
+        };
+      });
+    });
+
+    // Auto-edit the new milestone
+    setEditingMilestone(newMilestone.id);
+    setEditMilestoneText(newMilestone.title);
+  };
+
+  const skipMilestone = (milestoneId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMilestones(prev => prev.map(m =>
+      m.id === milestoneId ? { ...m, status: m.status === 'skipped' ? 'active' : 'skipped' as 'active' | 'skipped' | 'frozen' } : m
+    ).map((m, index, array) => {
+      // Recalculate isCurrent after skipping/unskipping
+      const firstIncompleteIndex = array.findIndex(milestone => !milestone.completed && milestone.status !== 'skipped');
+      return {
+        ...m,
+        isCurrent: index === firstIncompleteIndex && firstIncompleteIndex !== -1
+      };
+    }));
+  };
+
+  const freezeMilestone = (milestoneId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMilestones(prev => prev.map(m =>
+      m.id === milestoneId ? { ...m, status: m.status === 'frozen' ? 'active' : 'frozen' as 'active' | 'skipped' | 'frozen' } : m
+    ).map((m, index, array) => {
+      // Recalculate isCurrent after freezing/unfreezing
+      const firstIncompleteIndex = array.findIndex(milestone => !milestone.completed && milestone.status !== 'skipped');
+      return {
+        ...m,
+        isCurrent: index === firstIncompleteIndex && firstIncompleteIndex !== -1
+      };
+    }));
+  };
+
+  const handleReorder = (newOrder: Milestone[]) => {
+    // Recalculate y positions and isCurrent
+    const totalMilestones = newOrder.length;
+    const reordered = newOrder.map((m, idx, array) => {
+      const firstIncompleteIndex = array.findIndex(milestone => !milestone.completed && milestone.status !== 'skipped');
+      return {
+        ...m,
+        y: 15 + (idx / (totalMilestones - 1)) * 70,
+        isCurrent: idx === firstIncompleteIndex && firstIncompleteIndex !== -1
+      };
+    });
+    setMilestones(reordered);
+  };
+
+  const handleSubGoalsReorder = (milestoneId: string, newOrder: SubGoal[]) => {
+    setMilestones(prev => prev.map(m =>
+      m.id === milestoneId ? { ...m, subGoals: newOrder } : m
+    ));
+  };
+
+  const toggleMilestoneComplete = (milestoneId: string) => {
+    setMilestones(prev => {
+      const updatedMilestones = prev.map(m => {
+        if (m.id === milestoneId) {
+          return { ...m, completed: !m.completed };
+        }
+        return m;
+      });
+
+      // Move avatar to next incomplete milestone
+      const completedIndex = updatedMilestones.findIndex(m => m.id === milestoneId);
+      if (completedIndex !== -1 && updatedMilestones[completedIndex].completed) {
+        // Find next incomplete milestone (excluding skipped ones)
+        const nextIncomplete = updatedMilestones.findIndex((m, idx) => 
+          idx > completedIndex && !m.completed && m.status !== 'skipped'
+        );
+        
+        return updatedMilestones.map((m, idx) => ({
+          ...m,
+          isCurrent: nextIncomplete !== -1 ? idx === nextIncomplete : m.isCurrent
+        }));
+      }
+
+      return updatedMilestones;
     });
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
+  const addSubGoalAfter = (milestoneId: string, afterIndex: number) => {
+    const newSubGoal: SubGoal = {
+      id: `subgoal-${Date.now()}`,
+      title: 'New Subgoal',
+      completed: false,
+      side: 'right',
+      tasks: [
+        {
+          id: `subgoal-${Date.now()}-task-1`,
+          text: 'First task',
+          completed: false,
+          priority: 'medium'
+        }
+      ]
+    };
+
+    setMilestones(prev => prev.map(m =>
+      m.id === milestoneId ? {
+        ...m,
+        subGoals: [
+          ...m.subGoals.slice(0, afterIndex + 1),
+          newSubGoal,
+          ...m.subGoals.slice(afterIndex + 1)
+        ]
+      } : m
+    ));
+
+    // Auto-edit the new subgoal
+    setEditingSubGoal({ milestoneId, subGoalId: newSubGoal.id });
+    setEditSubGoalText(newSubGoal.title);
   };
 
   const getPriorityColor = (priority: 'high' | 'medium' | 'low') => {
@@ -298,586 +801,839 @@ export function QuestMap({ quest, onAskAI }: QuestMapProps) {
     }
   };
 
+  const getProgress = (milestone: Milestone) => {
+    const completed = milestone.subGoals.filter(sg => sg.completed).length;
+    return Math.round((completed / milestone.subGoals.length) * 100);
+  };
+
+  const selectedMilestoneData = milestones.find(m => m.id === selectedMilestone);
+  const selectedSubGoalData = selectedSubGoal ? 
+    milestones.find(m => m.id === selectedSubGoal.milestoneId)?.subGoals.find(sg => sg.id === selectedSubGoal.subGoalId) : 
+    null;
+
+  // Check if ALL subgoals in ALL milestones are complete
+  const allSubGoalsComplete = milestones.every(m => 
+    m.subGoals.length > 0 && m.subGoals.every(sg => sg.completed)
+  );
+
   return (
     <>
-      <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-b from-slate-50 to-white">
-        {/* Liquid hint bubble */}
-        <div className="absolute top-5 left-5 z-30">
+      <div className="w-full bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl p-8 shadow-2xl overflow-x-auto">
+        {/* Confirmation Banner - Shows when quest is not confirmed */}
+        {!quest.confirmed && onConfirmQuest && (
           <motion.div
-            className="relative px-5 py-2.5 bg-gradient-to-r from-indigo-500/90 to-purple-500/90 backdrop-blur-xl rounded-full shadow-xl"
-            animate={{
-              boxShadow: [
-                '0 4px 20px rgba(99, 102, 241, 0.3)',
-                '0 4px 30px rgba(139, 92, 246, 0.4)',
-                '0 4px 20px rgba(99, 102, 241, 0.3)'
-              ]
-            }}
-            transition={{ duration: 2, repeat: Infinity }}
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 bg-white/80 backdrop-blur-sm border-2 border-indigo-200 rounded-xl p-5 shadow-lg"
           >
-            <p className="text-white text-xs font-medium flex items-center gap-2">
-              <motion.span
-                animate={{ rotate: [0, 10, -10, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                💡
-              </motion.span>
-              Drag to explore your journey
-            </p>
-            
-            {/* Liquid drip effect */}
-            <motion.div
-              className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-purple-500/80 rounded-full"
-              animate={{
-                y: [0, 4, 0],
-                scaleY: [1, 1.5, 1],
-                opacity: [0.8, 0.4, 0.8]
-              }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            />
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-slate-900 mb-1">AI-Generated Quest Map</h3>
+                <p className="text-sm text-slate-600">
+                  Please review the generated plan below. The AI has broken down your goal into milestones, subgoals, and tasks. 
+                  Scroll through and confirm when you're ready to start your journey.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Header */}
+        <div className="mb-12 text-center">
+          <motion.div 
+            className="inline-flex items-center gap-4 bg-white px-8 py-5 rounded-2xl shadow-xl border-4 border-indigo-500"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 150 }}
+          >
+            <Trophy className="w-10 h-10 text-indigo-500" />
+            <h1 className="text-3xl text-gray-900">{quest.name}</h1>
           </motion.div>
         </div>
 
-        {/* Draggable container */}
-        <div
-          className={`relative w-full bg-gradient-to-b from-indigo-50/40 via-purple-50/30 to-emerald-50/50 overflow-hidden ${
-            isDragging ? 'cursor-grabbing' : 'cursor-grab'
-          }`}
-          style={{ height: `${containerHeight}px` }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+        {/* Legend */}
+        <motion.div 
+          className="mb-10 flex justify-center gap-8 text-sm"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
         >
-          {/* Pannable content */}
-          <div
-            style={{
-              transform: `translate(${pan.x}px, ${pan.y}px)`,
-              transition: isDragging ? 'none' : 'transform 0.2s ease-out',
-              width: '100%',
-              height: '100%',
-              position: 'relative'
-            }}
-          >
-            {/* LIQUID DESTINATION - Flowing achievement marker */}
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-              <motion.div
-                className="relative"
-                initial={{ opacity: 0, scale: 0.8, y: -30 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ delay: 0.5, type: 'spring', stiffness: 120 }}
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-yellow-400 border-2 border-yellow-600"></div>
+            <span className="text-gray-600 font-medium">Upcoming</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-green-500 border-2 border-green-700"></div>
+            <span className="text-gray-600 font-medium">Completed</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-blue-400 animate-pulse border-2 border-blue-600"></div>
+            <span className="text-gray-600 font-medium">Current Focus</span>
+          </div>
+        </motion.div>
+
+        {/* Roadmap */}
+        <Reorder.Group axis="y" values={milestones} onReorder={handleReorder} className="max-w-6xl mx-auto">
+          {milestones.map((milestone, idx) => {
+            const isCompleted = milestone.completed;
+            const isCurrent = milestone.isCurrent;
+            const progress = getProgress(milestone);
+            const isSkipped = milestone.status === 'skipped';
+            const isFrozen = milestone.status === 'frozen';
+            const isLastStep = idx === milestones.length - 1;
+
+            return (
+              <Reorder.Item 
+                key={milestone.id}
+                value={milestone}
+                className="mb-16 last:mb-0"
+                initial={{ opacity: 0, x: -50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.1, type: 'spring' }}
               >
-                {/* Flowing liquid aura */}
-                <motion.div
-                  className="absolute inset-0 -m-10"
-                  animate={{
-                    scale: [1, 1.2, 1],
-                    opacity: [0.4, 0.7, 0.4],
-                    rotate: [0, 5, 0]
-                  }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: 'easeInOut'
-                  }}
-                >
-                  <div className="w-28 h-28 bg-gradient-to-br from-amber-300/50 via-orange-400/50 to-pink-400/60 rounded-full blur-3xl" />
-                </motion.div>
-
-                {/* Liquid blob container */}
-                <motion.div
-                  className="relative px-6 py-4 bg-gradient-to-br from-amber-100/95 via-orange-100/95 to-pink-100/90 backdrop-blur-lg shadow-2xl overflow-hidden"
-                  style={{
-                    borderRadius: '40% 60% 70% 30% / 40% 50% 60% 50%'
-                  }}
-                  animate={{
-                    borderRadius: [
-                      '40% 60% 70% 30% / 40% 50% 60% 50%',
-                      '60% 40% 30% 70% / 50% 60% 40% 60%',
-                      '40% 60% 70% 30% / 40% 50% 60% 50%'
-                    ]
-                  }}
-                  transition={{
-                    duration: 8,
-                    repeat: Infinity,
-                    ease: 'easeInOut'
-                  }}
-                >
-                  {/* Flowing particles */}
-                  {[...Array(4)].map((_, i) => (
-                    <motion.div
-                      key={i}
-                      className="absolute"
-                      style={{
-                        left: `${20 + i * 20}%`,
-                        top: `${10 + Math.sin(i) * 20}%`
-                      }}
-                      animate={{
-                        y: [-8, -20, -8],
-                        x: [0, Math.sin(i * 2) * 10, 0],
-                        opacity: [0.3, 0.9, 0.3],
-                        scale: [0.6, 1.2, 0.6]
-                      }}
-                      transition={{
-                        duration: 2.5 + i * 0.5,
-                        repeat: Infinity,
-                        ease: 'easeInOut'
-                      }}
-                    >
-                      <div className="w-2 h-2 bg-yellow-400/60 rounded-full blur-sm" />
-                    </motion.div>
-                  ))}
-
-                  {/* Content */}
-                  <div className="relative flex items-center gap-3">
-                    <motion.div
-                      animate={{
-                        rotate: [-3, 3, -3],
-                        y: [0, -3, 0]
-                      }}
-                      transition={{
-                        duration: 3,
-                        repeat: Infinity,
-                        ease: 'easeInOut'
-                      }}
-                    >
-                      <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-pink-500 rounded-full flex items-center justify-center shadow-lg">
-                        <Trophy className="w-5 h-5 text-white" />
-                      </div>
-                    </motion.div>
-                    
-                    <div>
-                      <p className="font-semibold text-orange-900 text-sm">Destination</p>
-                      <p className="text-xs text-orange-700/80">Achievement Awaits</p>
-                    </div>
-
-                    {/* Floating star */}
-                    <motion.div
-                      className="absolute -top-2 -right-2"
-                      animate={{
-                        rotate: [0, 360],
-                        scale: [1, 1.3, 1]
-                      }}
-                      transition={{
-                        rotate: { duration: 5, repeat: Infinity, ease: 'linear' },
-                        scale: { duration: 2, repeat: Infinity, ease: 'easeInOut' }
-                      }}
-                    >
-                      <Star className="w-5 h-5 text-yellow-500 fill-yellow-400 drop-shadow-lg" />
-                    </motion.div>
+                {/* Milestone Row */}
+                <div className="flex items-start gap-8 relative">
+                  {/* Drag Handle - Left side */}
+                  <div className="flex flex-col items-center pt-6 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity -ml-6">
+                    <GripVertical className="w-5 h-5 text-gray-400" />
                   </div>
-                </motion.div>
 
-                {/* Liquid shimmer rays */}
-                <div className="absolute inset-0 -z-10 pointer-events-none">
-                  {[...Array(8)].map((_, i) => (
-                    <motion.div
-                      key={i}
-                      className="absolute top-1/2 left-1/2"
-                      style={{
-                        width: '2px',
-                        height: '80px',
-                        background: 'linear-gradient(to top, transparent, rgba(251, 191, 36, 0.4), transparent)',
-                        transformOrigin: 'top center',
-                        transform: `rotate(${(i * 360) / 8}deg)`,
-                        filter: 'blur(1px)'
-                      }}
-                      animate={{
-                        opacity: [0.2, 0.6, 0.2],
-                        scaleY: [0.8, 1.1, 0.8]
-                      }}
-                      transition={{
-                        duration: 2.5,
-                        repeat: Infinity,
-                        delay: i * 0.2
-                      }}
-                    />
-                  ))}
-                </div>
-              </motion.div>
-            </div>
-
-            {/* Forest atmosphere */}
-            <div className="absolute inset-0 opacity-30 pointer-events-none">
-              <div className="absolute top-0 left-10 w-48 h-48 bg-indigo-200/20 rounded-full blur-3xl" />
-              <div className="absolute top-0 right-16 w-56 h-56 bg-purple-200/20 rounded-full blur-3xl" />
-              <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-emerald-200/15 rounded-full blur-3xl" />
-              <div className="absolute top-1/3 right-1/4 w-72 h-72 bg-teal-200/15 rounded-full blur-3xl" />
-              <div className="absolute bottom-32 left-16 w-80 h-80 bg-green-300/20 rounded-full blur-3xl" />
-              <div className="absolute bottom-20 right-20 w-64 h-64 bg-emerald-300/25 rounded-full blur-3xl" />
-              <div className="absolute bottom-0 left-1/3 w-96 h-48 bg-green-400/20 rounded-full blur-3xl" />
-            </div>
-
-            {/* Tree silhouettes */}
-            <div className="absolute inset-0 pointer-events-none opacity-10">
-              <div className="absolute top-[20%] left-[12%] w-2 h-16 bg-green-800 rounded-full blur-sm" />
-              <div className="absolute top-[30%] right-[18%] w-2 h-20 bg-green-800 rounded-full blur-sm" />
-              <div className="absolute top-[45%] left-[22%] w-2 h-14 bg-green-800 rounded-full blur-sm" />
-              <div className="absolute top-[60%] right-[25%] w-2 h-18 bg-green-700 rounded-full blur-sm" />
-              <div className="absolute top-[75%] left-[30%] w-2 h-16 bg-green-700 rounded-full blur-sm" />
-            </div>
-
-            {/* SVG Path */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100">
-              <defs>
-                <linearGradient id="pathGradient" x1="0%" y1="100%" x2="0%" y2="0%">
-                  <stop offset="0%" stopColor="#86efac" stopOpacity="0.8" />
-                  <stop offset="50%" stopColor="#a5b4fc" stopOpacity="0.8" />
-                  <stop offset="100%" stopColor="#ddd6fe" stopOpacity="0.8" />
-                </linearGradient>
-                
-                <linearGradient id="progressGradient" x1="0%" y1="100%" x2="0%" y2="0%">
-                  <stop offset="0%" stopColor="#10b981" />
-                  <stop offset="40%" stopColor="#6366f1" />
-                  <stop offset="80%" stopColor="#8b5cf6" />
-                  <stop offset="100%" stopColor="#a855f7" />
-                </linearGradient>
-
-                <filter id="glow">
-                  <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
-                  <feMerge>
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
-                  </feMerge>
-                </filter>
-              </defs>
-
-              {/* White outline */}
-              <motion.path
-                d={fullPathString}
-                stroke="white"
-                strokeWidth="3"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity="0.7"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 2.5, ease: 'easeInOut' }}
-              />
-
-              {/* Complete path */}
-              <motion.path
-                d={fullPathString}
-                stroke="url(#pathGradient)"
-                strokeWidth="2.2"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 2.5, ease: 'easeInOut' }}
-              />
-
-              {/* Progress path */}
-              <motion.path
-                d={progressPathString}
-                stroke="url(#progressGradient)"
-                strokeWidth="2.8"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                filter="url(#glow)"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 3, ease: 'easeInOut', delay: 0.3 }}
-              />
-            </svg>
-
-            {/* Week Nodes */}
-            {weeks.map((week, index) => {
-              const point = pathPoints[index];
-
-              return (
-                <motion.div
-                  key={index}
-                  className="absolute cursor-pointer group z-10 pointer-events-auto"
-                  style={{
-                    left: `${point.x}%`,
-                    top: `${point.y}%`,
-                    transform: 'translate(-50%, -50%)'
-                  }}
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.8 + index * 0.06, type: 'spring', stiffness: 180, damping: 15 }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedWeek(index);
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                >
-                  <div className="relative">
-                    {/* Week Node - liquid style */}
-                    <motion.div
-                      className={`w-11 h-11 rounded-full flex items-center justify-center border-4 transition-all shadow-xl backdrop-blur-sm ${
-                        week.isCurrent
-                          ? 'bg-gradient-to-br from-orange-400 to-pink-500 border-white shadow-2xl'
-                          : week.isComplete
-                            ? 'bg-gradient-to-br from-indigo-600 to-purple-600 border-white shadow-indigo-400/60'
-                            : 'bg-white/95 border-slate-300 group-hover:border-indigo-400 group-hover:shadow-indigo-300/50'
-                      }`}
-                      animate={week.isCurrent ? {
-                        boxShadow: [
-                          '0 4px 30px rgba(251, 146, 60, 0.5)',
-                          '0 4px 40px rgba(236, 72, 153, 0.6)',
-                          '0 4px 30px rgba(251, 146, 60, 0.5)'
-                        ],
-                        scale: [1.25, 1.3, 1.25]
-                      } : {}}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    >
-                      {week.isComplete || week.isCurrent ? (
-                        <CheckCircle2 className="w-5 h-5 text-white drop-shadow-lg" />
-                      ) : (
-                        <div className="text-sm font-medium text-slate-600">{week.week}</div>
+                  {/* Left: Milestone Icon Box */}
+                  <div className="flex flex-col items-center flex-shrink-0 group/milestone">
+                    <div className="relative">
+                      {/* Status badges */}
+                      {isSkipped && (
+                        <Badge className="absolute -top-3 -left-3 z-10 bg-orange-500 text-white text-[10px] px-1.5 py-0.5">
+                          Skipped
+                        </Badge>
                       )}
-                    </motion.div>
+                      {isFrozen && (
+                        <Badge className="absolute -top-3 -left-3 z-10 bg-blue-400 text-white text-[10px] px-1.5 py-0.5">
+                          Frozen
+                        </Badge>
+                      )}
+                      {isLastStep && !isSkipped && !isFrozen && (
+                        <Badge className="absolute -top-3 -left-3 z-10 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-[10px] px-2 py-0.5 shadow-lg">
+                          🏁 FINAL STEP
+                        </Badge>
+                      )}
 
-                    {/* Liquid tooltip */}
-                    <div className="absolute -top-16 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-20">
                       <motion.div
-                        className="px-4 py-2 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-2xl shadow-2xl backdrop-blur-xl"
-                        style={{
-                          borderRadius: '40% 60% 50% 50% / 60% 40% 60% 40%'
-                        }}
+                        className={`relative w-20 h-20 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden ${
+                          isSkipped
+                            ? 'bg-gradient-to-br from-orange-300 via-orange-400 to-orange-500 shadow-lg shadow-orange-400/30 opacity-60'
+                            : isFrozen
+                            ? 'bg-gradient-to-br from-blue-300 via-blue-400 to-blue-500 shadow-lg shadow-blue-400/30'
+                            : isCompleted 
+                            ? isLastStep 
+                              ? 'bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-500 shadow-2xl shadow-yellow-500/60'
+                              : 'bg-gradient-to-br from-green-400 via-emerald-500 to-teal-600 shadow-xl shadow-green-500/40'
+                            : isCurrent
+                            ? isLastStep
+                              ? 'bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 shadow-2xl shadow-orange-500/60'
+                              : 'bg-gradient-to-br from-blue-400 via-indigo-500 to-purple-600 shadow-2xl shadow-blue-500/50'
+                            : isLastStep
+                            ? 'bg-gradient-to-br from-amber-300 via-yellow-400 to-orange-400 shadow-xl shadow-amber-500/50'
+                            : 'bg-gradient-to-br from-yellow-300 via-amber-400 to-orange-500 shadow-xl shadow-yellow-500/40'
+                        }`}
+                        whileHover={{ scale: 1.05, rotate: 3 }}
+                        whileTap={{ scale: 0.95 }}
+                        animate={isCurrent ? {
+                          scale: [1, 1.05, 1],
+                        } : {}}
+                        transition={{ duration: 2, repeat: Infinity }}
                       >
-                        <p className="text-sm font-medium">Week {week.week}</p>
-                        {week.isCurrent && <p className="text-xs text-orange-300">You're here!</p>}
+                        {/* Background decoration */}
+                        <div className="absolute inset-0 bg-white/10" />
+                        <motion.div
+                          className="absolute -top-2 -right-2 w-12 h-12 bg-white/20 rounded-full blur-xl"
+                          animate={{
+                            scale: [1, 1.3, 1],
+                            opacity: [0.3, 0.6, 0.3]
+                          }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        />
+                        
+                        {/* Sparkles for last step */}
+                        {isLastStep && (
+                          <>
+                            <motion.div
+                              className="absolute top-1 left-1"
+                              animate={{
+                                scale: [0, 1, 0],
+                                rotate: [0, 180, 360],
+                                opacity: [0, 1, 0]
+                              }}
+                              transition={{ duration: 2, repeat: Infinity, delay: 0 }}
+                            >
+                              <Sparkles className="w-3 h-3 text-yellow-200" />
+                            </motion.div>
+                            <motion.div
+                              className="absolute bottom-1 right-1"
+                              animate={{
+                                scale: [0, 1, 0],
+                                rotate: [0, -180, -360],
+                                opacity: [0, 1, 0]
+                              }}
+                              transition={{ duration: 2, repeat: Infinity, delay: 1 }}
+                            >
+                              <Sparkles className="w-3 h-3 text-yellow-200" />
+                            </motion.div>
+                          </>
+                        )}
+                        
+                        {/* Step number or checkmark */}
+                        <div className="relative z-10 flex flex-col items-center">
+                          {isCompleted ? (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1, rotate: 360 }}
+                              transition={{ type: 'spring', stiffness: 200 }}
+                            >
+                              <div className="w-8 h-8 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center mb-1">
+                                {isLastStep ? (
+                                  <Trophy className="w-5 h-5 text-white" />
+                                ) : (
+                                  <div className="w-4 h-4 border-l-3 border-b-3 border-white transform rotate-[-45deg] translate-y-[-2px]" />
+                                )}
+                              </div>
+                            </motion.div>
+                          ) : (
+                            <>
+                              {isLastStep ? (
+                                <Flag className="w-7 h-7 text-white drop-shadow-lg mb-1" />
+                              ) : (
+                                <span className="text-3xl font-bold text-white drop-shadow-lg">
+                                  {idx + 1}
+                                </span>
+                              )}
+                            </>
+                          )}
+                          <span className="text-[8px] uppercase tracking-wider text-white/90 font-semibold mt-0.5">
+                            {isCompleted ? (isLastStep ? 'Victory!' : 'Done') : isCurrent ? (isLastStep ? 'Final!' : 'Active') : (isLastStep ? 'Finish' : 'Step')}
+                          </span>
+                        </div>
+                        
+                        {isCurrent && (
+                          <motion.div 
+                            className="absolute -top-2 -right-2 w-5 h-5 bg-gradient-to-r from-orange-400 to-pink-500 rounded-full shadow-lg flex items-center justify-center"
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ delay: 0.5, type: 'spring' }}
+                          >
+                            <motion.div
+                              className="w-2 h-2 bg-white rounded-full"
+                              animate={{ scale: [1, 1.3, 1] }}
+                              transition={{ duration: 1, repeat: Infinity }}
+                            />
+                          </motion.div>
+                        )}
                       </motion.div>
+
+                      {/* Hover action buttons for milestone */}
+                      <div className="absolute -right-20 top-0 flex flex-col gap-1 opacity-0 group-hover/milestone:opacity-100 transition-opacity z-20">
+                        {onAskAI && (
+                          <motion.button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onAskAI(milestone.title, quest.name, 'milestone');
+                            }}
+                            className="p-1.5 hover:bg-indigo-100 rounded-md transition-colors bg-white shadow-md"
+                            whileHover={{ scale: 1.15 }}
+                            whileTap={{ scale: 0.9 }}
+                            title="Ask AI about this milestone"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 text-indigo-600" />
+                          </motion.button>
+                        )}
+                        <motion.button
+                          onClick={(e) => startEditMilestone(milestone.id, milestone.title, e)}
+                          className="p-1.5 hover:bg-slate-200 rounded-md transition-colors bg-white shadow-md"
+                          whileHover={{ scale: 1.15 }}
+                          whileTap={{ scale: 0.9 }}
+                          title="Edit milestone"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-slate-600" />
+                        </motion.button>
+                        <motion.button
+                          onClick={(e) => skipMilestone(milestone.id, e)}
+                          className={`p-1.5 hover:bg-orange-100 rounded-md transition-colors ${isSkipped ? 'bg-orange-100' : 'bg-white'} shadow-md`}
+                          whileHover={{ scale: 1.15 }}
+                          whileTap={{ scale: 0.9 }}
+                          title={isSkipped ? 'Unskip milestone' : 'Skip milestone'}
+                        >
+                          <SkipForward className="w-3.5 h-3.5 text-orange-600" />
+                        </motion.button>
+                        <motion.button
+                          onClick={(e) => freezeMilestone(milestone.id, e)}
+                          className={`p-1.5 hover:bg-blue-100 rounded-md transition-colors ${isFrozen ? 'bg-blue-100' : 'bg-white'} shadow-md`}
+                          whileHover={{ scale: 1.15 }}
+                          whileTap={{ scale: 0.9 }}
+                          title={isFrozen ? 'Unfreeze milestone' : 'Freeze milestone'}
+                        >
+                          <Snowflake className="w-3.5 h-3.5 text-blue-600" />
+                        </motion.button>
+                        <motion.button
+                          onClick={(e) => deleteMilestone(milestone.id, e)}
+                          className="p-1.5 hover:bg-red-100 rounded-md transition-colors bg-white shadow-md"
+                          whileHover={{ scale: 1.15 }}
+                          whileTap={{ scale: 0.9 }}
+                          title="Delete milestone"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                        </motion.button>
+                      </div>
                     </div>
 
-                    {/* LIQUID "You are here" marker */}
-                    {week.isCurrent && (
+                    {/* Avatar indicator at current position */}
+                    {isCurrent && (
                       <motion.div
-                        className="absolute -bottom-14 left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none"
-                        initial={{ opacity: 0, y: -15, scale: 0.8 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        transition={{ delay: 1.8, type: 'spring', stiffness: 150 }}
+                        className="mt-3"
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.7, type: 'spring' }}
                       >
                         <motion.div
-                          className="relative px-5 py-2 bg-gradient-to-r from-orange-500 via-pink-500 to-rose-500 shadow-2xl backdrop-blur-lg overflow-hidden"
-                          style={{
-                            borderRadius: '45% 55% 60% 40% / 50% 60% 40% 50%'
-                          }}
+                          className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 via-pink-500 to-rose-500 border-2 border-white shadow-xl flex items-center justify-center text-white text-lg"
                           animate={{
-                            borderRadius: [
-                              '45% 55% 60% 40% / 50% 60% 40% 50%',
-                              '55% 45% 40% 60% / 40% 50% 60% 50%',
-                              '45% 55% 60% 40% / 50% 60% 40% 50%'
-                            ],
+                            y: [0, -6, 0],
                             boxShadow: [
-                              '0 8px 30px rgba(249, 115, 22, 0.5)',
-                              '0 8px 40px rgba(236, 72, 153, 0.6)',
-                              '0 8px 30px rgba(249, 115, 22, 0.5)'
+                              '0 4px 20px rgba(249, 115, 22, 0.4)',
+                              '0 6px 30px rgba(236, 72, 153, 0.5)',
+                              '0 4px 20px rgba(249, 115, 22, 0.4)'
                             ]
                           }}
-                          transition={{
-                            duration: 4,
-                            repeat: Infinity,
-                            ease: 'easeInOut'
-                          }}
+                          transition={{ duration: 2, repeat: Infinity }}
                         >
-                          {/* Flowing gradient overlay */}
-                          <motion.div
-                            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                            animate={{
-                              x: ['-100%', '200%']
-                            }}
-                            transition={{
-                              duration: 3,
-                              repeat: Infinity,
-                              ease: 'linear'
-                            }}
-                          />
-
-                          <p className="relative text-white font-medium text-sm flex items-center gap-2">
-                            <motion.span
-                              animate={{ y: [0, -2, 0] }}
-                              transition={{ duration: 1.5, repeat: Infinity }}
-                            >
-                              <MapPin className="w-4 h-4" />
-                            </motion.span>
-                            You are here
-                          </p>
+                          👤
                         </motion.div>
                       </motion.div>
                     )}
+
+                    {/* Progress Bar */}
+                    {!isCompleted && (
+                      <motion.div 
+                        className={`${isCurrent ? 'mt-2' : 'mt-4'} w-20`}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.3 }}
+                      >
+                        <div className="h-2 bg-white/20 rounded-full overflow-hidden shadow-inner backdrop-blur-sm">
+                          <motion.div 
+                            className={`h-full transition-all ${isCurrent ? 'bg-gradient-to-r from-blue-500 to-purple-500' : 'bg-gradient-to-r from-indigo-500 to-blue-500'}`}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${progress}%` }}
+                            transition={{ delay: 0.5, duration: 0.8 }}
+                          />
+                        </div>
+                        <p className="text-xs text-center text-gray-700 mt-1 font-bold">{progress}%</p>
+                      </motion.div>
+                    )}
+
+                    {/* Connecting Line with Insert Button */}
+                    {idx < milestones.length - 1 && (
+                      <div className="relative group/connector my-5">
+                        <motion.div 
+                          className="w-1 h-20 bg-gradient-to-b from-gray-400 to-gray-300 rounded-full"
+                          initial={{ height: 0 }}
+                          animate={{ height: 80 }}
+                          transition={{ delay: 0.3 + idx * 0.1 }}
+                        />
+                        {/* Insert milestone button */}
+                        <motion.button
+                          onClick={() => addMilestoneAfter(idx)}
+                          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-indigo-500 hover:bg-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover/connector:opacity-100 transition-all"
+                          whileHover={{ scale: 1.2 }}
+                          whileTap={{ scale: 0.9 }}
+                          title="Insert milestone here"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </motion.button>
+                      </div>
+                    )}
                   </div>
-                </motion.div>
-              );
-            })}
 
-            {/* Milestone Labels - liquid style */}
-            {quest.milestones.map((milestone: string, index: number) => {
-              const weekIndex = index * 4;
-              const point = pathPoints[weekIndex];
-              if (!point) return null;
+                  {/* Right: Milestone Content */}
+                  <div className="flex-1 min-w-0">
+                    {editingMilestone === milestone.id ? (
+                      <div className="flex items-center gap-2 mb-5">
+                        <Input
+                          value={editMilestoneText}
+                          onChange={(e) => setEditMilestoneText(e.target.value)}
+                          className="h-10 text-xl"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveEditMilestone(milestone.id);
+                            if (e.key === 'Escape') setEditingMilestone(null);
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-10 w-10 p-0"
+                          onClick={() => saveEditMilestone(milestone.id)}
+                        >
+                          <Check className="w-5 h-5 text-emerald-600" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-10 w-10 p-0"
+                          onClick={() => setEditingMilestone(null)}
+                        >
+                          <XCircle className="w-5 h-5 text-slate-400" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <motion.h2 
+                        className="text-xl text-gray-900 mb-5"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.2 }}
+                      >
+                        {milestone.title}
+                      </motion.h2>
+                    )}
 
-              const isLeftSide = point.x < 50;
-              const xOffset = isLeftSide ? -12 : 12;
+                    {/* Branch Cards Grid */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {milestone.subGoals.map((branch, branchIdx) => (
+                        <div 
+                          key={branch.id}
+                          className="relative group/subgoal-container"
+                        >
+                          <motion.div
+                            className={`group/branch relative p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-lg ${
+                              branch.completed
+                                ? 'bg-green-50 border-green-500'
+                                : 'bg-white border-gray-300 hover:border-indigo-400 hover:bg-indigo-50/30'
+                            }`}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 + branchIdx * 0.05 }}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => {
+                              if (!editingSubGoal || editingSubGoal.subGoalId !== branch.id) {
+                                setSelectedSubGoal({ milestoneId: milestone.id, subGoalId: branch.id });
+                              }
+                            }}
+                          >
+                          {/* Action buttons on hover */}
+                          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/branch:opacity-100 transition-opacity z-10">
+                            {onAskAI && (
+                              <motion.button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onAskAI(branch.title, quest.name, milestone.title);
+                                }}
+                                className="p-1.5 hover:bg-indigo-100 rounded-md transition-colors bg-white shadow-sm"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                title="Ask AI about this subgoal"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5 text-indigo-600" />
+                              </motion.button>
+                            )}
+                            <motion.button
+                              onClick={(e) => startEditSubGoal(milestone.id, branch.id, branch.title, e)}
+                              className="p-1.5 hover:bg-slate-200 rounded-md transition-colors bg-white shadow-sm"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              title="Edit subgoal"
+                            >
+                              <Edit2 className="w-3.5 h-3.5 text-slate-600" />
+                            </motion.button>
+                            <motion.button
+                              onClick={(e) => deleteSubGoal(milestone.id, branch.id, e)}
+                              className="p-1.5 hover:bg-red-100 rounded-md transition-colors bg-white shadow-sm"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              title="Delete subgoal"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                            </motion.button>
+                          </div>
 
-              return (
-                <motion.div
-                  key={index}
-                  className="absolute font-medium text-indigo-900 bg-gradient-to-br from-white/95 to-indigo-50/95 backdrop-blur-lg shadow-xl pointer-events-none overflow-hidden"
-                  style={{
-                    left: `${point.x + xOffset}%`,
-                    top: `${point.y}%`,
-                    transform: isLeftSide ? 'translate(-100%, -50%)' : 'translate(0%, -50%)',
-                    borderRadius: '40% 60% 55% 45% / 60% 40% 60% 40%',
-                    padding: '0.6rem 1rem'
-                  }}
-                  initial={{ opacity: 0, x: isLeftSide ? 15 : -15 }}
-                  animate={{ 
-                    opacity: 1, 
-                    x: 0,
-                    borderRadius: [
-                      '40% 60% 55% 45% / 60% 40% 60% 40%',
-                      '50% 50% 60% 40% / 50% 50% 50% 50%',
-                      '40% 60% 55% 45% / 60% 40% 60% 40%'
-                    ]
-                  }}
-                  transition={{ 
-                    opacity: { delay: 1.2 + index * 0.25, type: 'spring' },
-                    x: { delay: 1.2 + index * 0.25, type: 'spring' },
-                    borderRadius: { duration: 6, repeat: Infinity, ease: 'easeInOut' }
-                  }}
-                >
-                  {/* Shimmer effect */}
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-200/30 to-transparent"
-                    animate={{
-                      x: ['-100%', '200%']
-                    }}
-                    transition={{
-                      duration: 4,
-                      repeat: Infinity,
-                      ease: 'linear',
-                      delay: index * 0.5
-                    }}
-                  />
+                          <div className="flex items-start justify-between">
+                            {editingSubGoal?.milestoneId === milestone.id && editingSubGoal?.subGoalId === branch.id ? (
+                              <div className="flex items-center gap-2 flex-1 mr-2" onClick={(e) => e.stopPropagation()}>
+                                <Input
+                                  value={editSubGoalText}
+                                  onChange={(e) => setEditSubGoalText(e.target.value)}
+                                  className="h-8 text-sm"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveEditSubGoal(milestone.id, branch.id);
+                                    if (e.key === 'Escape') setEditingSubGoal(null);
+                                  }}
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => saveEditSubGoal(milestone.id, branch.id)}
+                                >
+                                  <Check className="w-4 h-4 text-emerald-600" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => setEditingSubGoal(null)}
+                                >
+                                  <XCircle className="w-4 h-4 text-slate-400" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <>
+                                <h3 className="font-semibold text-gray-900 pr-2 text-sm">{branch.title}</h3>
+                                {branch.completed ? (
+                                  <Check className="w-4 h-4 text-green-600 flex-shrink-0" strokeWidth={3} />
+                                ) : (
+                                  <Circle className="w-4 h-4 text-gray-400 flex-shrink-0 group-hover/branch:text-indigo-500 transition-colors" />
+                                )}
+                              </>
+                            )}
+                          </div>
+                          {!editingSubGoal || editingSubGoal.subGoalId !== branch.id ? (
+                            <p className="text-xs text-gray-500 mt-1.5">
+                              {branch.tasks.filter(t => t.completed).length}/{branch.tasks.length} tasks • Click to view
+                            </p>
+                          ) : null}
+                          </motion.div>
+                        </div>
+                      ))}
+                    </div>
 
-                  <div className="relative flex items-center gap-2">
-                    <Target className="w-4 h-4 text-indigo-600 flex-shrink-0" />
-                    <span className="whitespace-nowrap text-xs">{milestone}</span>
+                    {/* Add subgoal button */}
+                    <motion.button
+                      onClick={() => addNewSubGoal(milestone.id)}
+                      className="mt-3 w-full px-4 py-2.5 border-2 border-dashed border-indigo-300 hover:border-indigo-400 hover:bg-indigo-50/50 text-indigo-600 hover:text-indigo-700 text-sm rounded-lg transition-all flex items-center justify-center gap-2"
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add New Subgoal
+                    </motion.button>
                   </div>
-                </motion.div>
-              );
-            })}
+                </div>
+              </Reorder.Item>
+            );
+          })}
+        </Reorder.Group>
 
-            {/* LIQUID "Start Journey" marker */}
-            <motion.div
-              className="absolute bottom-8 left-1/2 -translate-x-1/2 pointer-events-none"
-              initial={{ opacity: 0, y: 30, scale: 0.8 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ delay: 0.4, type: 'spring', stiffness: 120 }}
-            >
+        {/* Epic Celebration Animation - Only shows when ALL subgoals are complete */}
+        {allSubGoalsComplete && !celebrationDismissed && (
+          <>
+            {/* Confetti burst particles */}
+            {[...Array(50)].map((_, i) => (
               <motion.div
-                className="relative px-7 py-3.5 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 shadow-2xl backdrop-blur-lg overflow-hidden"
+                key={`confetti-${i}`}
+                className="absolute w-3 h-3 rounded-full pointer-events-none z-50"
                 style={{
-                  borderRadius: '50% 50% 50% 50% / 60% 60% 40% 40%'
+                  background: [
+                    'linear-gradient(135deg, #fbbf24, #f59e0b)',
+                    'linear-gradient(135deg, #34d399, #10b981)',
+                    'linear-gradient(135deg, #60a5fa, #3b82f6)',
+                    'linear-gradient(135deg, #f472b6, #ec4899)',
+                    'linear-gradient(135deg, #a78bfa, #8b5cf6)',
+                  ][i % 5],
+                  left: '50%',
+                  top: '50%',
+                }}
+                initial={{ 
+                  x: 0, 
+                  y: 0, 
+                  scale: 0,
+                  opacity: 1
                 }}
                 animate={{
-                  borderRadius: [
-                    '50% 50% 50% 50% / 60% 60% 40% 40%',
-                    '40% 60% 60% 40% / 50% 50% 50% 50%',
-                    '50% 50% 50% 50% / 60% 60% 40% 40%'
-                  ],
-                  boxShadow: [
-                    '0 10px 40px rgba(16, 185, 129, 0.4)',
-                    '0 10px 50px rgba(20, 184, 166, 0.5)',
-                    '0 10px 40px rgba(16, 185, 129, 0.4)'
-                  ]
+                  x: Math.cos((i / 50) * Math.PI * 2) * (300 + Math.random() * 400),
+                  y: Math.sin((i / 50) * Math.PI * 2) * (300 + Math.random() * 400) - 100,
+                  scale: [0, 1.5, 1],
+                  opacity: [1, 1, 0],
+                  rotate: Math.random() * 720 - 360,
                 }}
                 transition={{
-                  duration: 5,
+                  duration: 2 + Math.random() * 2,
+                  repeat: Infinity,
+                  repeatDelay: 1,
+                  delay: Math.random() * 0.5,
+                  ease: 'easeOut'
+                }}
+              />
+            ))}
+
+            {/* Sparkle stars */}
+            {[...Array(30)].map((_, i) => (
+              <motion.div
+                key={`star-${i}`}
+                className="absolute pointer-events-none z-50"
+                style={{
+                  left: `${20 + Math.random() * 60}%`,
+                  top: `${20 + Math.random() * 60}%`,
+                }}
+                initial={{ scale: 0, rotate: 0, opacity: 0 }}
+                animate={{
+                  scale: [0, 1, 0],
+                  rotate: [0, 180, 360],
+                  opacity: [0, 1, 0],
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  delay: Math.random() * 2,
+                  repeatDelay: 1 + Math.random(),
+                }}
+              >
+                <Star className="w-6 h-6 text-yellow-400 fill-yellow-300" />
+              </motion.div>
+            ))}
+
+            {/* Central celebration card */}
+            <motion.div
+              className="mt-12 text-center relative"
+              initial={{ opacity: 0, scale: 0.5, y: 50 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+            >
+              {/* Glowing ring effect */}
+              <motion.div
+                className="absolute inset-0 -m-8 rounded-full bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-500 blur-3xl opacity-30"
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.3, 0.5, 0.3],
+                }}
+                transition={{
+                  duration: 3,
                   repeat: Infinity,
                   ease: 'easeInOut'
                 }}
-              >
-                {/* Flowing shine */}
+              />
+
+              <div className="relative inline-flex flex-col items-center gap-6 bg-gradient-to-br from-amber-50 via-white to-emerald-50 px-12 py-8 rounded-3xl shadow-2xl border-4 border-transparent bg-clip-padding">
+                {/* Animated trophy */}
                 <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
                   animate={{
-                    x: ['-100%', '200%']
+                    rotate: [0, -10, 10, -10, 0],
+                    scale: [1, 1.1, 1],
                   }}
                   transition={{
-                    duration: 3,
+                    duration: 2,
                     repeat: Infinity,
-                    ease: 'linear'
+                    repeatDelay: 1,
                   }}
-                />
+                >
+                  <div className="relative">
+                    <Trophy className="w-24 h-24 text-yellow-500 drop-shadow-2xl" />
+                    <motion.div
+                      className="absolute inset-0 bg-yellow-400 rounded-full blur-2xl opacity-50"
+                      animate={{
+                        scale: [1, 1.5, 1],
+                        opacity: [0.5, 0.8, 0.5],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                      }}
+                    />
+                  </div>
+                </motion.div>
 
-                {/* Liquid bubbles */}
-                {[...Array(3)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    className="absolute bottom-0"
-                    style={{
-                      left: `${30 + i * 20}%`
-                    }}
-                    animate={{
-                      y: [0, -15, -30],
-                      opacity: [0.6, 0.3, 0],
-                      scale: [0.5, 0.8, 0.3]
-                    }}
-                    transition={{
-                      duration: 2 + i * 0.5,
-                      repeat: Infinity,
-                      ease: 'easeOut'
-                    }}
+                {/* Success message */}
+                <div className="space-y-2">
+                  <motion.h2
+                    className="text-4xl bg-gradient-to-r from-yellow-600 via-orange-500 to-pink-500 bg-clip-text text-transparent"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
                   >
-                    <div className="w-1.5 h-1.5 bg-white/60 rounded-full" />
-                  </motion.div>
-                ))}
+                    🎉 QUEST COMPLETE! 🎉
+                  </motion.h2>
+                  <motion.p
+                    className="text-lg text-gray-600"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    You've achieved your North Star!
+                  </motion.p>
+                </div>
 
-                <p className="relative text-white font-semibold flex items-center gap-2">
-                  <Flag className="w-5 h-5" />
-                  Start Your Journey
-                </p>
-              </motion.div>
+                {/* Achievement badges */}
+                <motion.div
+                  className="flex gap-4 items-center"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.7 }}
+                >
+                  <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 text-sm shadow-lg">
+                    ✓ All Milestones
+                  </Badge>
+                  <Badge className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-2 text-sm shadow-lg">
+                    ✓ All Subgoals
+                  </Badge>
+                  <Badge className="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-4 py-2 text-sm shadow-lg">
+                    ✓ 100% Complete
+                  </Badge>
+                </motion.div>
+
+                {/* Sparkle decorations */}
+                <motion.div
+                  className="absolute -top-6 -left-6"
+                  animate={{ rotate: 360, scale: [1, 1.2, 1] }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                >
+                  <Sparkles className="w-8 h-8 text-yellow-400" />
+                </motion.div>
+                <motion.div
+                  className="absolute -top-6 -right-6"
+                  animate={{ rotate: -360, scale: [1, 1.2, 1] }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                >
+                  <Sparkles className="w-8 h-8 text-pink-400" />
+                </motion.div>
+                <motion.div
+                  className="absolute -bottom-6 -left-6"
+                  animate={{ rotate: 360, scale: [1, 1.2, 1] }}
+                  transition={{ duration: 3, repeat: Infinity, delay: 1 }}
+                >
+                  <Sparkles className="w-8 h-8 text-blue-400" />
+                </motion.div>
+                <motion.div
+                  className="absolute -bottom-6 -right-6"
+                  animate={{ rotate: -360, scale: [1, 1.2, 1] }}
+                  transition={{ duration: 3, repeat: Infinity, delay: 1 }}
+                >
+                  <Sparkles className="w-8 h-8 text-purple-400" />
+                </motion.div>
+
+                {/* Dismiss Button */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1 }}
+                  className="mt-4"
+                >
+                  <Button
+                    onClick={() => {
+                      setCelebrationDismissed(true);
+                      if (onQuestComplete) {
+                        onQuestComplete(quest.id);
+                      }
+                    }}
+                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-3 text-base shadow-xl"
+                  >
+                    Mark Quest as Complete
+                  </Button>
+                </motion.div>
+              </div>
             </motion.div>
-          </div>
-        </div>
+          </>
+        )}
+
+        {/* Quest Completed State - Shows after celebration is dismissed */}
+        {allSubGoalsComplete && celebrationDismissed && (
+          <motion.div
+            className="mt-12 text-center"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 200 }}
+          >
+            <div className="inline-flex flex-col items-center gap-4 bg-white px-10 py-6 rounded-2xl shadow-xl border-2 border-green-500">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center">
+                  <Trophy className="w-7 h-7 text-white" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-2xl text-gray-900">Quest Completed</h3>
+                  <p className="text-sm text-gray-600">All milestones and subgoals achieved!</p>
+                </div>
+              </div>
+              <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2">
+                ✓ 100% Complete
+              </Badge>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Confirmation Button - Shows at the end when quest is not confirmed */}
+        {!quest.confirmed && onConfirmQuest && !allSubGoalsComplete && (
+          <motion.div
+            className="mt-12 text-center"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <div className="bg-white/80 backdrop-blur-sm border-2 border-indigo-200 rounded-xl p-8 shadow-lg inline-block">
+              <div className="mb-4">
+                <CheckCircle2 className="w-12 h-12 mx-auto text-indigo-500 mb-3" />
+                <h3 className="text-xl text-slate-900 mb-2">Ready to Begin?</h3>
+                <p className="text-sm text-slate-600 max-w-md">
+                  You've reviewed the AI-generated quest map. Confirm to start tracking your progress and working towards your goal.
+                </p>
+              </div>
+              <div className="flex gap-3 justify-center">
+                <Button
+                  onClick={() => onRegenerateQuest && onRegenerateQuest()}
+                  size="lg"
+                  variant="outline"
+                  className="border-2 border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 px-8 py-6"
+                >
+                  <Sparkles className="w-5 h-5 mr-2" />
+                  Regenerate with AI
+                </Button>
+                <Button
+                  onClick={() => onConfirmQuest(quest.id)}
+                  size="lg"
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 px-8 py-6 shadow-xl"
+                >
+                  <CheckCircle2 className="w-5 h-5 mr-2" />
+                  Confirm & Start Quest
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </div>
 
-      {/* Week Details Modal - INTERACTIVE TASK MANAGEMENT */}
+      {/* Milestone Overview Modal */}
       <AnimatePresence>
-        {selectedWeek !== null && (
+        {selectedMilestone && selectedMilestoneData && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
-            onClick={() => setSelectedWeek(null)}
+            onClick={() => setSelectedMilestone(null)}
           >
             <motion.div
               initial={{ scale: 0.85, y: 30, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.85, y: 30, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-2xl max-h-[90vh] overflow-hidden"
+              className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               <Card className="overflow-hidden shadow-2xl border-0 bg-white/95 backdrop-blur-xl">
-                {/* COMPACT HEADER */}
-                <div className="relative bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 text-white p-6 overflow-hidden">
-                  {/* Animated background blobs */}
-                  <div className="absolute inset-0 overflow-hidden opacity-40">
+                {/* Header */}
+                <div className="relative bg-gradient-to-r from-indigo-500 via-indigo-600 to-blue-600 text-white p-6 overflow-hidden">
+                  {/* Animated background */}
+                  <div className="absolute inset-0 overflow-hidden opacity-20">
                     <motion.div
-                      className="absolute -top-10 -left-10 w-40 h-40 bg-white/20 rounded-full blur-3xl"
+                      className="absolute -top-10 -left-10 w-40 h-40 bg-white/30 rounded-full blur-3xl"
                       animate={{ x: [0, 20, 0], y: [0, 15, 0], scale: [1, 1.1, 1] }}
                       transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-                    />
-                    <motion.div
-                      className="absolute -bottom-10 -right-10 w-48 h-48 bg-pink-400/30 rounded-full blur-3xl"
-                      animate={{ x: [0, -15, 0], y: [0, -20, 0], scale: [1, 1.15, 1] }}
-                      transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
                     />
                   </div>
 
                   {/* Close button */}
                   <motion.button
-                    onClick={() => setSelectedWeek(null)}
+                    onClick={() => setSelectedMilestone(null)}
                     className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xl flex items-center justify-center transition-colors z-10"
                     whileHover={{ scale: 1.1, rotate: 90 }}
                     whileTap={{ scale: 0.95 }}
@@ -885,120 +1641,51 @@ export function QuestMap({ quest, onAskAI }: QuestMapProps) {
                     <X className="w-4 h-4" />
                   </motion.button>
 
-                  {/* Header content - with progress ring */}
-                  <div className="relative flex items-center justify-between gap-6">
-                    <div className="flex items-center gap-4 flex-1">
-                      <motion.div
-                        className="relative w-14 h-14"
-                        initial={{ scale: 0, rotate: -180 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                        transition={{ type: 'spring', delay: 0.2 }}
-                      >
-                        {/* Circular progress ring */}
-                        <svg className="w-14 h-14 -rotate-90" viewBox="0 0 36 36">
-                          {/* Background circle */}
-                          <circle
-                            cx="18"
-                            cy="18"
-                            r="14"
-                            fill="none"
-                            stroke="rgba(255,255,255,0.2)"
-                            strokeWidth="3"
-                          />
-                          {/* Progress circle */}
-                          <motion.circle
-                            cx="18"
-                            cy="18"
-                            r="14"
-                            fill="none"
-                            stroke="white"
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                            strokeDasharray="88"
-                            initial={{ strokeDashoffset: 88 }}
-                            animate={{ 
-                              strokeDashoffset: weeks[selectedWeek].isComplete ? 0 : 88 - (88 * 0.4)
-                            }}
-                            transition={{ duration: 1, delay: 0.4, ease: 'easeOut' }}
-                          />
-                        </svg>
-                        {/* Center icon */}
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <Calendar className="w-6 h-6" />
-                        </div>
-                      </motion.div>
-                      
-                      <div className="flex-1">
-                        <motion.h3 
-                          className="text-2xl mb-0.5"
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.2 }}
-                        >
-                          Week {weeks[selectedWeek].week}
-                        </motion.h3>
-                        <motion.div
-                          className="flex items-center gap-2"
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.3 }}
-                        >
-                          <Badge className={`${
-                            weeks[selectedWeek].isComplete
-                              ? 'bg-emerald-400/30 hover:bg-emerald-400/40 text-emerald-100'
-                              : weeks[selectedWeek].isCurrent
-                                ? 'bg-orange-400/30 hover:bg-orange-400/40 text-orange-100'
-                                : 'bg-white/20 hover:bg-white/30 text-white'
-                          } border-0 px-2.5 py-0.5 text-xs`}>
-                            {weeks[selectedWeek].isComplete ? '✓ Complete' : weeks[selectedWeek].isCurrent ? '● Active' : '○ Upcoming'}
-                          </Badge>
-                          {!weeks[selectedWeek].isComplete && (
-                            <span className="text-xs text-white/70">3/7 days</span>
-                          )}
-                        </motion.div>
-                      </div>
-                    </div>
-
-                    {/* Focus pill */}
+                  {/* Header content */}
+                  <div className="relative flex items-center gap-4">
                     <motion.div
-                      className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-xl border border-white/20"
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.4 }}
+                      className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-xl flex items-center justify-center"
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: 'spring', delay: 0.2 }}
                     >
-                      <Target className="w-4 h-4 text-white/80" />
-                      <span className="text-xs text-white/90 max-w-[180px] truncate">{weeks[selectedWeek].milestone}</span>
+                      <Target className="w-7 h-7" />
                     </motion.div>
+                    
+                    <div className="flex-1">
+                      <motion.p 
+                        className="text-xs uppercase tracking-wider text-white/70 mb-1"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.1 }}
+                      >
+                        Milestone {milestones.findIndex(m => m.id === selectedMilestone) + 1} of {milestones.length}
+                      </motion.p>
+                      <motion.h3 
+                        className="text-xl mb-1"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2 }}
+                      >
+                        {selectedMilestoneData.title}
+                      </motion.h3>
+                      <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.3 }}
+                      >
+                        <Badge className="bg-white/20 hover:bg-white/30 text-white border-0">
+                          {selectedMilestoneData.completed ? '✓ Completed' : 
+                           selectedMilestoneData.isCurrent ? '● Current' : 
+                           '○ Upcoming'}
+                        </Badge>
+                      </motion.div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Current week energy boost */}
-                {weeks[selectedWeek].isCurrent && (
-                  <motion.div
-                    className="relative px-5 py-3 bg-gradient-to-r from-orange-100 via-pink-100 to-rose-100 overflow-hidden"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent"
-                      animate={{ x: ['-100%', '200%'] }}
-                      transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-                    />
-                    <p className="relative text-sm text-orange-900 flex items-center gap-2 font-medium">
-                      <motion.span
-                        animate={{ scale: [1, 1.2, 1] }}
-                        transition={{ duration: 1, repeat: Infinity }}
-                      >
-                        🔥
-                      </motion.span>
-                      You're crushing it! Keep the momentum going.
-                    </p>
-                  </motion.div>
-                )}
-
-                {/* ACCORDION DAYS WITH TASK MANAGEMENT */}
-                <div className="p-6 bg-gradient-to-b from-slate-50 to-white max-h-[calc(90vh-240px)] overflow-y-auto">
+                {/* Tasks */}
+                <div className="p-6 bg-gradient-to-b from-slate-50 to-white max-h-[calc(85vh-180px)] overflow-y-auto">
                   <motion.div
                     className="flex items-center justify-between mb-4"
                     initial={{ opacity: 0 }}
@@ -1007,210 +1694,457 @@ export function QuestMap({ quest, onAskAI }: QuestMapProps) {
                   >
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-indigo-600" />
-                      <h4 className="text-sm uppercase tracking-wider text-slate-600 font-semibold">Your 7-Day Plan</h4>
+                      <h4 className="text-sm uppercase tracking-wider text-slate-600 font-semibold">Milestone Overview Tasks</h4>
                     </div>
-                    <span className="text-xs text-slate-500">Click days to manage tasks</span>
+                    <span className="text-xs text-slate-500">
+                      {selectedMilestoneData.tasks.filter(t => t.completed).length}/{selectedMilestoneData.tasks.length} completed
+                    </span>
                   </motion.div>
 
-                  <Accordion 
-                    type="multiple" 
-                    className="space-y-2"
-                    value={currentDayAccordion}
-                    onValueChange={setCurrentDayAccordion}
+                  <Reorder.Group 
+                    axis="y" 
+                    values={selectedMilestoneData.tasks} 
+                    onReorder={(newOrder) => reorderTasks(selectedMilestone, newOrder, false)}
+                    className="space-y-3"
                   >
-                    {[
-                      { day: 'monday', name: 'Monday', gradient: 'from-indigo-500 to-indigo-600', borderColor: 'border-indigo-200', emoji: '💪' },
-                      { day: 'tuesday', name: 'Tuesday', gradient: 'from-purple-500 to-purple-600', borderColor: 'border-purple-200', emoji: '🎯' },
-                      { day: 'wednesday', name: 'Wednesday', gradient: 'from-pink-500 to-pink-600', borderColor: 'border-pink-200', emoji: '⚡' },
-                      { day: 'thursday', name: 'Thursday', gradient: 'from-orange-500 to-orange-600', borderColor: 'border-orange-200', emoji: '🚀' },
-                      { day: 'friday', name: 'Friday', gradient: 'from-emerald-500 to-emerald-600', borderColor: 'border-emerald-200', emoji: '🎉' },
-                      { day: 'saturday', name: 'Saturday', gradient: 'from-teal-500 to-teal-600', borderColor: 'border-teal-200', emoji: '✨' },
-                      { day: 'sunday', name: 'Sunday', gradient: 'from-violet-500 to-violet-600', borderColor: 'border-violet-200', emoji: '🌟' }
-                    ].map((dayInfo, dayIndex) => {
-                      const tasks = weeks[selectedWeek].dailyPlan[dayInfo.day] || [];
-                      const completedCount = tasks.filter(t => t.completed).length;
-                      
-                      return (
+                    {selectedMilestoneData.tasks.map((task, taskIndex) => (
+                      <Reorder.Item 
+                        key={task.id} 
+                        value={task}
+                        className="group/task"
+                      >
                         <motion.div
-                          key={dayInfo.day}
+                          className="flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50/50 transition-colors border border-slate-100"
+                          layout
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.5 + dayIndex * 0.04 }}
+                          transition={{ delay: 0.5 + taskIndex * 0.05 }}
                         >
-                          <AccordionItem 
-                            value={dayInfo.day}
-                            className={`border ${dayInfo.borderColor} rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-all`}
+                          {/* Drag handle */}
+                          <motion.div
+                            className="opacity-0 group-hover/task:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                            whileHover={{ scale: 1.1 }}
                           >
-                            <AccordionTrigger className="px-4 py-3 hover:no-underline group [&[data-state=open]]:bg-gradient-to-r [&[data-state=open]]:from-slate-50 [&[data-state=open]]:to-white">
-                              <div className="flex items-center gap-3 flex-1">
-                                <motion.div
-                                  className={`w-9 h-9 rounded-lg bg-gradient-to-br ${dayInfo.gradient} flex items-center justify-center text-white shadow-md`}
-                                  whileHover={{ scale: 1.05 }}
+                            <GripVertical className="w-4 h-4 text-slate-400 mt-1" />
+                          </motion.div>
+
+                          {/* Checkbox */}
+                          <motion.button
+                            onClick={() => toggleTaskComplete(selectedMilestone, task.id)}
+                            whileHover={{ scale: 1.2 }}
+                            whileTap={{ scale: 0.9 }}
+                            className="mt-1"
+                          >
+                            {task.completed ? (
+                              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                            ) : (
+                              <Circle className="w-5 h-5 text-slate-400 flex-shrink-0 group-hover/task:text-slate-600 transition-colors" />
+                            )}
+                          </motion.button>
+
+                          {/* Task content */}
+                          <div className="flex-1 min-w-0">
+                            {editingTask?.parentId === selectedMilestone && editingTask?.taskId === task.id ? (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  value={editText}
+                                  onChange={(e) => setEditText(e.target.value)}
+                                  className="h-9 text-sm"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveEditTask(selectedMilestone, task.id, false);
+                                    if (e.key === 'Escape') setEditingTask(null);
+                                  }}
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-9 w-9 p-0"
+                                  onClick={() => saveEditTask(selectedMilestone, task.id, false)}
                                 >
-                                  <span className="text-base">{dayInfo.emoji}</span>
-                                </motion.div>
-                                <div className="flex-1 text-left">
-                                  <p className="font-semibold text-slate-800">{dayInfo.name}</p>
-                                  <p className="text-xs text-slate-500">
-                                    {completedCount}/{tasks.length} completed
-                                    {completedCount === tasks.length && tasks.length > 0 && (
-                                      <span className="ml-2 text-emerald-600">✓ All done!</span>
-                                    )}
-                                  </p>
-                                </div>
+                                  <Check className="w-4 h-4 text-emerald-600" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-9 w-9 p-0"
+                                  onClick={() => setEditingTask(null)}
+                                >
+                                  <XCircle className="w-4 h-4 text-slate-400" />
+                                </Button>
                               </div>
-                            </AccordionTrigger>
-                            <AccordionContent className="px-4 pb-4 pt-2">
-                              <Reorder.Group 
-                                axis="y" 
-                                values={tasks} 
-                                onReorder={(newOrder) => reorderTasks(selectedWeek, dayInfo.day, newOrder)}
-                                className="space-y-2.5"
-                              >
-                                {tasks.map((task) => (
-                                  <Reorder.Item 
-                                    key={task.id} 
-                                    value={task}
-                                    className="group/task"
+                            ) : (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`text-sm text-slate-700 ${task.completed ? 'line-through text-slate-400' : ''}`}>
+                                  {task.text}
+                                </span>
+                                {/* Priority badge */}
+                                <motion.button
+                                  onClick={() => changePriority(selectedMilestone, task.id, false)}
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                >
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs px-2 py-0 h-5 ${getPriorityColor(task.priority)} cursor-pointer`}
                                   >
-                                    <motion.div
-                                      className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-slate-50/50 transition-colors"
-                                      layout
-                                    >
-                                      {/* Drag handle */}
-                                      <motion.div
-                                        className="opacity-0 group-hover/task:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
-                                        whileHover={{ scale: 1.1 }}
-                                      >
-                                        <GripVertical className="w-4 h-4 text-slate-400 mt-0.5" />
-                                      </motion.div>
+                                    {getPriorityIcon(task.priority)} {task.priority}
+                                  </Badge>
+                                </motion.button>
+                              </div>
+                            )}
+                          </div>
 
-                                      {/* Checkbox */}
-                                      <motion.button
-                                        onClick={() => toggleTaskComplete(selectedWeek, dayInfo.day, task.id)}
-                                        whileHover={{ scale: 1.2 }}
-                                        whileTap={{ scale: 0.9 }}
-                                        className="mt-0.5"
-                                      >
-                                        {task.completed ? (
-                                          <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                                        ) : (
-                                          <Circle className="w-5 h-5 text-slate-400 flex-shrink-0 group-hover/task:text-slate-600 transition-colors" />
-                                        )}
-                                      </motion.button>
-
-                                      {/* Task text or edit input */}
-                                      <div className="flex-1 min-w-0">
-                                        {editingTask?.day === dayInfo.day && editingTask?.taskId === task.id ? (
-                                          <div className="flex items-center gap-2">
-                                            <Input
-                                              value={editText}
-                                              onChange={(e) => setEditText(e.target.value)}
-                                              className="h-8 text-sm"
-                                              autoFocus
-                                              onKeyDown={(e) => {
-                                                if (e.key === 'Enter') saveEditTask(selectedWeek, dayInfo.day, task.id);
-                                                if (e.key === 'Escape') setEditingTask(null);
-                                              }}
-                                            />
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              className="h-8 w-8 p-0"
-                                              onClick={() => saveEditTask(selectedWeek, dayInfo.day, task.id)}
-                                            >
-                                              <Check className="w-4 h-4 text-emerald-600" />
-                                            </Button>
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              className="h-8 w-8 p-0"
-                                              onClick={() => setEditingTask(null)}
-                                            >
-                                              <XCircle className="w-4 h-4 text-slate-400" />
-                                            </Button>
-                                          </div>
-                                        ) : (
-                                          <div className="flex items-center gap-2 flex-wrap">
-                                            <span className={`text-sm text-slate-700 leading-relaxed ${task.completed ? 'line-through text-slate-400' : ''}`}>
-                                              {task.text}
-                                            </span>
-                                            {/* Priority badge */}
-                                            <motion.button
-                                              onClick={() => changePriority(selectedWeek, dayInfo.day, task.id)}
-                                              whileHover={{ scale: 1.1 }}
-                                              whileTap={{ scale: 0.9 }}
-                                            >
-                                              <Badge 
-                                                variant="outline" 
-                                                className={`text-xs px-2 py-0 h-5 ${getPriorityColor(task.priority)} cursor-pointer`}
-                                              >
-                                                {getPriorityIcon(task.priority)} {task.priority}
-                                              </Badge>
-                                            </motion.button>
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Action buttons */}
-                                      {editingTask?.day !== dayInfo.day || editingTask?.taskId !== task.id ? (
-                                        <div className="flex items-center gap-1 opacity-0 group-hover/task:opacity-100 transition-opacity">
-                                          {onAskAI && (
-                                            <motion.button
-                                              onClick={() => onAskAI(task.text, quest.name, dayInfo.day)}
-                                              className="p-1.5 hover:bg-indigo-100 rounded-md transition-colors group/ai"
-                                              whileHover={{ scale: 1.1 }}
-                                              whileTap={{ scale: 0.9 }}
-                                              title="Ask AI about this task"
-                                            >
-                                              <MessageCircle className="w-3.5 h-3.5 text-indigo-600 group-hover/ai:text-indigo-700" />
-                                            </motion.button>
-                                          )}
-                                          <motion.button
-                                            onClick={() => startEditTask(dayInfo.day, task.id, task.text)}
-                                            className="p-1.5 hover:bg-slate-200 rounded-md transition-colors"
-                                            whileHover={{ scale: 1.1 }}
-                                            whileTap={{ scale: 0.9 }}
-                                          >
-                                            <Edit2 className="w-3.5 h-3.5 text-slate-500" />
-                                          </motion.button>
-                                          <motion.button
-                                            onClick={() => deleteTask(selectedWeek, dayInfo.day, task.id)}
-                                            className="p-1.5 hover:bg-red-100 rounded-md transition-colors"
-                                            whileHover={{ scale: 1.1 }}
-                                            whileTap={{ scale: 0.9 }}
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                          </motion.button>
-                                        </div>
-                                      ) : null}
-                                    </motion.div>
-                                  </Reorder.Item>
-                                ))}
-                              </Reorder.Group>
-
-                              {/* Add new task button */}
+                          {/* Action buttons */}
+                          {editingTask?.parentId !== selectedMilestone || editingTask?.taskId !== task.id ? (
+                            <div className="flex items-center gap-1 opacity-0 group-hover/task:opacity-100 transition-opacity">
+                              {onAskAI && (
+                                <motion.button
+                                  onClick={() => onAskAI(task.text, quest.name, selectedMilestoneData.title)}
+                                  className="p-1.5 hover:bg-indigo-100 rounded-md transition-colors"
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  title="Ask AI about this task"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5 text-indigo-600" />
+                                </motion.button>
+                              )}
                               <motion.button
-                                onClick={() => addNewTask(selectedWeek, dayInfo.day)}
-                                className="w-full mt-3 px-3 py-2 border-2 border-dashed border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 rounded-lg text-sm text-slate-500 hover:text-indigo-600 transition-all flex items-center justify-center gap-2"
-                                whileHover={{ scale: 1.01 }}
-                                whileTap={{ scale: 0.99 }}
+                                onClick={() => startEditTask(selectedMilestone, task.id, task.text)}
+                                className="p-1.5 hover:bg-slate-200 rounded-md transition-colors"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
                               >
-                                <Plus className="w-4 h-4" />
-                                Add new task
+                                <Edit2 className="w-3.5 h-3.5 text-slate-500" />
                               </motion.button>
-                            </AccordionContent>
-                          </AccordionItem>
+                              <motion.button
+                                onClick={() => deleteTask(selectedMilestone, task.id, false)}
+                                className="p-1.5 hover:bg-red-100 rounded-md transition-colors"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                              </motion.button>
+                            </div>
+                          ) : null}
                         </motion.div>
-                      );
-                    })}
-                  </Accordion>
+                      </Reorder.Item>
+                    ))}
+                  </Reorder.Group>
+
+                  {/* Add task button */}
+                  <motion.button
+                    onClick={() => addNewTask(selectedMilestone, false)}
+                    className="w-full mt-4 px-4 py-3 border-2 border-dashed border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 rounded-xl text-sm text-slate-500 hover:text-indigo-600 transition-all flex items-center justify-center gap-2"
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add new task
+                  </motion.button>
                 </div>
               </Card>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* SubGoal Tasks Modal */}
+      <AnimatePresence>
+        {selectedSubGoal && selectedSubGoalData && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
+            onClick={() => setSelectedSubGoal(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.85, y: 30, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.85, y: 30, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Card className="overflow-hidden shadow-2xl border-0 bg-white/95 backdrop-blur-xl">
+                {/* Header */}
+                <div className={`relative text-white p-6 overflow-hidden ${
+                  selectedSubGoalData.completed
+                    ? 'bg-gradient-to-r from-green-500 via-green-600 to-emerald-600'
+                    : 'bg-gradient-to-r from-purple-500 via-purple-600 to-pink-600'
+                }`}>
+                  {/* Animated background */}
+                  <div className="absolute inset-0 overflow-hidden opacity-20">
+                    <motion.div
+                      className="absolute -top-10 -left-10 w-40 h-40 bg-white/30 rounded-full blur-3xl"
+                      animate={{ x: [0, 20, 0], y: [0, 15, 0], scale: [1, 1.1, 1] }}
+                      transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+                    />
+                  </div>
+
+                  {/* Close button */}
+                  <motion.button
+                    onClick={() => setSelectedSubGoal(null)}
+                    className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xl flex items-center justify-center transition-colors z-10"
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <X className="w-4 h-4" />
+                  </motion.button>
+
+                  {/* Header content */}
+                  <div className="relative flex items-center gap-4">
+                    <motion.div
+                      className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-xl flex items-center justify-center"
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: 'spring', delay: 0.2 }}
+                    >
+                      <Star className="w-7 h-7" />
+                    </motion.div>
+                    
+                    <div className="flex-1">
+                      <motion.h3 
+                        className="text-xl mb-1"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2 }}
+                      >
+                        {selectedSubGoalData.title}
+                      </motion.h3>
+                      <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.3 }}
+                      >
+                        <Badge className="bg-white/20 hover:bg-white/30 text-white border-0">
+                          {selectedSubGoalData.completed ? '✓ Completed' : '○ In Progress'}
+                        </Badge>
+                      </motion.div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tasks */}
+                <div className="p-6 bg-gradient-to-b from-slate-50 to-white max-h-[calc(85vh-180px)] overflow-y-auto">
+                  <motion.div
+                    className="flex items-center justify-between mb-4"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-purple-600" />
+                      <h4 className="text-sm uppercase tracking-wider text-slate-600 font-semibold">Subtask Details</h4>
+                    </div>
+                    <span className="text-xs text-slate-500">
+                      {selectedSubGoalData.tasks.filter(t => t.completed).length}/{selectedSubGoalData.tasks.length} completed
+                    </span>
+                  </motion.div>
+
+                  <Reorder.Group 
+                    axis="y" 
+                    values={selectedSubGoalData.tasks} 
+                    onReorder={(newOrder) => reorderTasks(selectedSubGoal.subGoalId, newOrder, true)}
+                    className="space-y-3"
+                  >
+                    {selectedSubGoalData.tasks.map((task, taskIndex) => (
+                      <Reorder.Item 
+                        key={task.id} 
+                        value={task}
+                        className="group/task"
+                      >
+                        <motion.div
+                          className="flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50/50 transition-colors border border-slate-100"
+                          layout
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.5 + taskIndex * 0.05 }}
+                        >
+                          {/* Drag handle */}
+                          <motion.div
+                            className="opacity-0 group-hover/task:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                            whileHover={{ scale: 1.1 }}
+                          >
+                            <GripVertical className="w-4 h-4 text-slate-400 mt-1" />
+                          </motion.div>
+
+                          {/* Checkbox */}
+                          <motion.button
+                            onClick={() => toggleSubGoalTaskComplete(selectedSubGoal.milestoneId, selectedSubGoal.subGoalId, task.id)}
+                            whileHover={{ scale: 1.2 }}
+                            whileTap={{ scale: 0.9 }}
+                            className="mt-1"
+                          >
+                            {task.completed ? (
+                              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                            ) : (
+                              <Circle className="w-5 h-5 text-slate-400 flex-shrink-0 group-hover/task:text-slate-600 transition-colors" />
+                            )}
+                          </motion.button>
+
+                          {/* Task content */}
+                          <div className="flex-1 min-w-0">
+                            {editingTask?.parentId === selectedSubGoal.subGoalId && editingTask?.taskId === task.id ? (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  value={editText}
+                                  onChange={(e) => setEditText(e.target.value)}
+                                  className="h-9 text-sm"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveEditTask(selectedSubGoal.subGoalId, task.id, true);
+                                    if (e.key === 'Escape') setEditingTask(null);
+                                  }}
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-9 w-9 p-0"
+                                  onClick={() => saveEditTask(selectedSubGoal.subGoalId, task.id, true)}
+                                >
+                                  <Check className="w-4 h-4 text-emerald-600" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-9 w-9 p-0"
+                                  onClick={() => setEditingTask(null)}
+                                >
+                                  <XCircle className="w-4 h-4 text-slate-400" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`text-sm text-slate-700 ${task.completed ? 'line-through text-slate-400' : ''}`}>
+                                  {task.text}
+                                </span>
+                                {/* Priority badge */}
+                                <motion.button
+                                  onClick={() => changePriority(selectedSubGoal.subGoalId, task.id, true)}
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                >
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs px-2 py-0 h-5 ${getPriorityColor(task.priority)} cursor-pointer`}
+                                  >
+                                    {getPriorityIcon(task.priority)} {task.priority}
+                                  </Badge>
+                                </motion.button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Action buttons */}
+                          {editingTask?.parentId !== selectedSubGoal.subGoalId || editingTask?.taskId !== task.id ? (
+                            <div className="flex items-center gap-1 opacity-0 group-hover/task:opacity-100 transition-opacity">
+                              {onAskAI && (
+                                <motion.button
+                                  onClick={() => onAskAI(task.text, quest.name, selectedSubGoalData.title)}
+                                  className="p-1.5 hover:bg-purple-100 rounded-md transition-colors"
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  title="Ask AI about this task"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5 text-purple-600" />
+                                </motion.button>
+                              )}
+                              <motion.button
+                                onClick={() => startEditTask(selectedSubGoal.subGoalId, task.id, task.text)}
+                                className="p-1.5 hover:bg-slate-200 rounded-md transition-colors"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                              >
+                                <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+                              </motion.button>
+                              <motion.button
+                                onClick={() => deleteTask(selectedSubGoal.subGoalId, task.id, true)}
+                                className="p-1.5 hover:bg-red-100 rounded-md transition-colors"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                              </motion.button>
+                            </div>
+                          ) : null}
+                        </motion.div>
+                      </Reorder.Item>
+                    ))}
+                  </Reorder.Group>
+
+                  {/* Add task button */}
+                  <motion.button
+                    onClick={() => addNewTask(selectedSubGoal.subGoalId, true)}
+                    className="w-full mt-4 px-4 py-3 border-2 border-dashed border-slate-200 hover:border-purple-300 hover:bg-purple-50/50 rounded-xl text-sm text-slate-500 hover:text-purple-600 transition-all flex items-center justify-center gap-2"
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add new task
+                  </motion.button>
+                </div>
+              </Card>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirmation?.type === 'milestone' && (
+                <>
+                  Do you want to delete the milestone <strong>"{deleteConfirmation.title}"</strong>?
+                  <br />
+                  This will also delete all subgoals and tasks within it.
+                </>
+              )}
+              {deleteConfirmation?.type === 'subgoal' && (
+                <>
+                  Do you want to delete the subgoal <strong>"{deleteConfirmation.title}"</strong>?
+                  <br />
+                  This will also delete all tasks within it.
+                </>
+              )}
+              {deleteConfirmation?.type === 'task' && (
+                <>
+                  Do you want to delete the task <strong>"{deleteConfirmation.title}"</strong>?
+                </>
+              )}
+              <br />
+              <br />
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteConfirmation(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!deleteConfirmation) return;
+                
+                if (deleteConfirmation.type === 'milestone') {
+                  confirmDeleteMilestone(deleteConfirmation.id);
+                } else if (deleteConfirmation.type === 'subgoal' && deleteConfirmation.parentId) {
+                  confirmDeleteSubGoal(deleteConfirmation.parentId, deleteConfirmation.id);
+                } else if (deleteConfirmation.type === 'task' && deleteConfirmation.parentId) {
+                  const isSubGoal = !!selectedSubGoal;
+                  confirmDeleteTask(deleteConfirmation.parentId, deleteConfirmation.id, isSubGoal);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

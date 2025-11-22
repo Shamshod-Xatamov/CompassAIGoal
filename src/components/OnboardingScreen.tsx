@@ -99,165 +99,161 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
   };
 
   const handleBuildQuestMap = () => {
+    // Create quest with simple milestone strings - QuestMap will generate the full structure
+    const questData = {
+      id: 1,
+      name: 'Launch Side Project',
+      type: 'primary',
+      progress: 0,
+      currentMilestone: 0,
+      milestones: [
+        'Define MVP',
+        'Build Core Features',
+        'Beta Testing',
+        'Launch'
+      ]
+    };
+
     onComplete({
       northStar: 'To feel a sense of creative accomplishment',
-      quests: [
-        {
-          id: 1,
-          name: 'Launch Side Project',
-          type: 'primary',
-          progress: 35,
-          milestones: ['Define MVP', 'Build Core Features', 'Beta Testing', 'Launch'],
-          currentMilestone: 1
-        },
-        {
-          id: 2,
-          name: 'Learn Guitar',
-          type: 'active',
-          progress: 60,
-          milestones: ['Basic Chords', 'First Song', 'Fingerpicking', 'Performance'],
-          currentMilestone: 2
-        },
-        {
-          id: 3,
-          name: 'Health & Fitness',
-          type: 'active',
-          progress: 45,
-          milestones: ['Routine Established', 'First 30 Days', 'Habit Locked', 'Goal Weight'],
-          currentMilestone: 1
-        }
-      ]
+      quests: [questData]
     });
   };
 
   return (
     <div className="h-screen flex overflow-hidden">
-      {/* Left Panel - Immersive Branding */}
-      <motion.div
-        className="w-2/5 relative overflow-hidden flex items-center justify-center"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-      >
-        {/* Animated Gradient Background */}
+      {/* Left Panel - Immersive Branding (hidden during conversation) */}
+      {step !== 'conversation' && (
         <motion.div
-          className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600"
-          animate={{
-            backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
-          }}
-          transition={{
-            duration: 15,
-            repeat: Infinity,
-            ease: 'linear'
-          }}
-          style={{
-            backgroundSize: '200% 200%'
-          }}
-        />
-
-        {/* Floating Particles */}
-        {[...Array(20)].map((_, i) => (
+          className="w-1/2 relative overflow-hidden flex items-center justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          {/* Animated Gradient Background */}
           <motion.div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
+            className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600"
             animate={{
-              y: [0, -30, 0],
-              opacity: [0.2, 0.8, 0.2],
-              scale: [1, 1.5, 1],
+              backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
             }}
             transition={{
-              duration: 3 + Math.random() * 4,
+              duration: 15,
               repeat: Infinity,
-              delay: Math.random() * 2,
-              ease: 'easeInOut'
+              ease: 'linear'
+            }}
+            style={{
+              backgroundSize: '200% 200%'
             }}
           />
-        ))}
 
-        {/* Constellation Lines */}
-        <svg className="absolute inset-0 w-full h-full opacity-20">
-          <motion.line
-            x1="20%" y1="20%" x2="40%" y2="35%"
-            stroke="white"
-            strokeWidth="1"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 2, delay: 0.5 }}
-          />
-          <motion.line
-            x1="40%" y1="35%" x2="60%" y2="30%"
-            stroke="white"
-            strokeWidth="1"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 2, delay: 0.7 }}
-          />
-          <motion.line
-            x1="60%" y1="30%" x2="75%" y2="50%"
-            stroke="white"
-            strokeWidth="1"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 2, delay: 0.9 }}
-          />
-          <motion.line
-            x1="40%" y1="35%" x2="50%" y2="60%"
-            stroke="white"
-            strokeWidth="1"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 2, delay: 1.1 }}
-          />
-        </svg>
-
-        {/* Main Content */}
-        <div className="relative z-10 text-white text-center px-12">
-          <motion.div
-            initial={{ scale: 0.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
-          >
+          {/* Floating Particles */}
+          {[...Array(20)].map((_, i) => (
             <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 60, repeat: Infinity, ease: 'linear' }}
-            >
-              <Compass className="w-24 h-24 mx-auto mb-8 drop-shadow-2xl" strokeWidth={1.5} />
-            </motion.div>
-            <motion.h1 
-              className="text-6xl mb-4 tracking-tight"
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.5 }}
-            >
-              Compass
-            </motion.h1>
-            <motion.p 
-              className="text-2xl opacity-90"
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.7 }}
-            >
-              Find your North Star
-            </motion.p>
-          </motion.div>
-        </div>
+              key={i}
+              className="absolute w-1 h-1 bg-white rounded-full"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+              }}
+              animate={{
+                y: [0, -30, 0],
+                opacity: [0.2, 0.8, 0.2],
+                scale: [1, 1.5, 1],
+              }}
+              transition={{
+                duration: 3 + Math.random() * 4,
+                repeat: Infinity,
+                delay: Math.random() * 2,
+                ease: 'easeInOut'
+              }}
+            />
+          ))}
 
-        {/* Ambient Glow */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
-        
-        {/* Water-like blend effect - right edge */}
-        <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-r from-transparent via-indigo-600/10 to-indigo-400/20 pointer-events-none blur-2xl" />
-        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-r from-transparent to-purple-500/15 pointer-events-none blur-xl" />
-      </motion.div>
+          {/* Constellation Lines */}
+          <svg className="absolute inset-0 w-full h-full opacity-20">
+            <motion.line
+              x1="20%" y1="20%" x2="40%" y2="35%"
+              stroke="white"
+              strokeWidth="1"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 2, delay: 0.5 }}
+            />
+            <motion.line
+              x1="40%" y1="35%" x2="60%" y2="30%"
+              stroke="white"
+              strokeWidth="1"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 2, delay: 0.7 }}
+            />
+            <motion.line
+              x1="60%" y1="30%" x2="75%" y2="50%"
+              stroke="white"
+              strokeWidth="1"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 2, delay: 0.9 }}
+            />
+            <motion.line
+              x1="40%" y1="35%" x2="50%" y2="60%"
+              stroke="white"
+              strokeWidth="1"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 2, delay: 1.1 }}
+            />
+          </svg>
+
+          {/* Main Content */}
+          <div className="relative z-10 text-white text-center px-12">
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 60, repeat: Infinity, ease: 'linear' }}
+              >
+                <Compass className="w-24 h-24 mx-auto mb-8 drop-shadow-2xl" strokeWidth={1.5} />
+              </motion.div>
+              <motion.h1 
+                className="text-6xl mb-4 tracking-tight"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.5 }}
+              >
+                Compass
+              </motion.h1>
+              <motion.p 
+                className="text-2xl opacity-90"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.7 }}
+              >
+                Find your North Star
+              </motion.p>
+            </motion.div>
+          </div>
+
+          {/* Ambient Glow */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
+          
+          {/* Water-like blend effect - right edge */}
+          <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-r from-transparent via-indigo-600/10 to-indigo-400/20 pointer-events-none blur-2xl" />
+          <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-r from-transparent to-purple-500/15 pointer-events-none blur-xl" />
+        </motion.div>
+      )}
 
       {/* Right Panel - Interactive Onboarding */}
-      <div className="w-3/5 bg-gradient-to-br from-slate-50 to-white flex items-center justify-center p-16 relative overflow-y-auto">
-        {/* Water-like blend effect - left edge */}
-        <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-l from-transparent via-indigo-50 to-indigo-100/30 pointer-events-none blur-2xl" />
-        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-l from-transparent to-purple-50/50 pointer-events-none blur-xl" />
+      <div className={`${step === 'conversation' ? 'w-full' : 'w-1/2'} bg-gradient-to-br from-slate-50 to-white flex items-center justify-center p-16 relative overflow-y-auto`}>
+        {/* Water-like blend effect - left edge (only when split view) */}
+        {step !== 'conversation' && (
+          <>
+            <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-l from-transparent via-indigo-50 to-indigo-100/30 pointer-events-none blur-2xl" />
+            <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-l from-transparent to-purple-50/50 pointer-events-none blur-xl" />
+          </>
+        )}
         {/* Subtle Background Pattern */}
         <div className="absolute inset-0 opacity-[0.02]" style={{
           backgroundImage: 'radial-gradient(circle at 2px 2px, #6366f1 1px, transparent 0)',

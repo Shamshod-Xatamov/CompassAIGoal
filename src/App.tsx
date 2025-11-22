@@ -15,7 +15,16 @@ export default function App() {
   });
 
   const handleOnboardingComplete = (data: any) => {
-    setUserData(data);
+    // Mark the quest as unconfirmed
+    const questWithConfirmationFlag = {
+      ...data.quests[0],
+      confirmed: false
+    };
+    
+    setUserData({
+      northStar: data.northStar,
+      quests: [questWithConfirmationFlag]
+    });
     setCurrentScreen('dashboard');
   };
 
@@ -59,6 +68,11 @@ export default function App() {
     setChatOpen(true);
   };
 
+  const handleRegenerateQuest = () => {
+    setChatContext('regenerate-quest');
+    setChatOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       {currentScreen === 'landing' ? (
@@ -86,11 +100,13 @@ export default function App() {
       ) : (
         <>
           <Dashboard 
-            userData={userData} 
+            userData={userData}
+            setUserData={setUserData}
             onOpenWeeklyReview={() => setCurrentScreen('weeklyReview')}
             onOpenChatForQuest={handleOpenChatForQuest}
             onAskAIAboutTask={handleAskAIAboutTask}
             onAskAIAboutQuest={handleAskAIAboutQuest}
+            onRegenerateQuest={handleRegenerateQuest}
           />
           <ChatWidget 
             isOpen={chatOpen}

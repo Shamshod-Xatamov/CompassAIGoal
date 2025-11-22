@@ -140,6 +140,20 @@ export function ChatWidget({
       if (onContextHandled) {
         onContextHandled();
       }
+    } else if (context === 'regenerate-quest' && isOpen) {
+      // Handle quest regeneration request
+      const regenerateMessage = "I'd like to regenerate my Quest. Can you help me create a better plan?";
+      setMessages(prev => [...prev, { sender: 'user', text: regenerateMessage }]);
+      
+      setTimeout(() => {
+        const aiResponse = "Of course! I'd be happy to help you regenerate your Quest with a fresh approach. ✨\n\nLet's make sure this plan truly aligns with your North Star and works for your unique situation.\n\nTell me:\n• What isn't working with the current plan?\n• Are there specific milestones that feel off?\n• Do you need a different timeline?\n• Should we break things down differently?\n• Any new insights about your goal?\n\nShare your thoughts, and I'll create an improved Quest Map for you!";
+        setMessages(prev => [...prev, { sender: 'ai', text: aiResponse }]);
+      }, 1000);
+      
+      // Clear the context
+      if (onContextHandled) {
+        onContextHandled();
+      }
     }
   }, [context, isOpen, onContextHandled]);
 

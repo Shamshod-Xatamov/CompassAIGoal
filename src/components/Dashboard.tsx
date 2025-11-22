@@ -25,14 +25,27 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle 
 } from './ui/alert-dialog';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from './ui/popover';
 import { QuestMap } from './QuestMap';
 import { GoalProgress } from './GoalProgress';
+import { GoalScape } from './GoalScape';
 import { 
   Target, Flame, Trophy, Calendar, 
   CheckCircle2, Circle, Edit2, Trash2, Plus, GripVertical, Check, XCircle,
   MoreVertical, Pause, Play, Archive, TrendingUp, AlertCircle, Sparkles, Star, MessageCircle,
   Compass, User, Settings, LogOut, HelpCircle, Bell, Shield, CreditCard, Keyboard,
-  Moon, Sun, Palette, Zap, Mail, Lock, Eye, Download, Upload, Menu, ChevronLeft, ChevronRight
+  Moon, Sun, Palette, Zap, Mail, Lock, Eye, Download, Upload, Menu, ChevronLeft, ChevronRight, X, GitBranch, CircleDot
 } from 'lucide-react';
 
 interface Task {
@@ -45,14 +58,17 @@ interface Task {
 
 interface DashboardProps {
   userData: any;
+  setUserData: (data: any) => void;
   onOpenWeeklyReview: () => void;
   onOpenChatForQuest?: () => void;
   onAskAIAboutTask?: (taskText: string, questName: string, dayOfWeek: string) => void;
   onAskAIAboutQuest?: (questName: string, progress: number, currentMilestone: string) => void;
+  onRegenerateQuest?: () => void;
 }
 
-export function Dashboard({ userData, onOpenWeeklyReview, onOpenChatForQuest, onAskAIAboutTask, onAskAIAboutQuest }: DashboardProps) {
-  const [selectedQuest, setSelectedQuest] = useState(userData.quests[0]);
+export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenChatForQuest, onAskAIAboutTask, onAskAIAboutQuest, onRegenerateQuest }: DashboardProps) {
+  const [selectedQuest, setSelectedQuest] = useState(userData.quests[0] || null);
+  const [mapView, setMapView] = useState<'tree' | 'circle'>('tree'); // Toggle between Quest Map and GoalScape
   
   // Sidebar collapsed state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -68,6 +84,43 @@ export function Dashboard({ userData, onOpenWeeklyReview, onOpenChatForQuest, on
   const [editingQuestName, setEditingQuestName] = useState('');
   const [questToDelete, setQuestToDelete] = useState<any>(null);
   const [pausedQuests, setPausedQuests] = useState<Set<string>>(new Set());
+  
+  // Streak popover state
+  const [showStreakPopover, setShowStreakPopover] = useState(false);
+  
+  // Streak full details dialog state
+  const [showStreakDetailsDialog, setShowStreakDetailsDialog] = useState(false);
+  
+  // Progress dialog state
+  const [showProgressDialog, setShowProgressDialog] = useState(false);
+  
+  // Current viewing month for calendar
+  const [viewingMonth, setViewingMonth] = useState(new Date());
+  
+  // Generate mock streak data for the past 42 days (6 weeks)
+  const generateStreakData = () => {
+    const data = [];
+    const today = new Date();
+    for (let i = 41; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      // Simulate activity - 85% chance of being active, with occasional skips
+      const isActive = Math.random() > 0.15;
+      // Make sure recent days (last 28) are all active to match current streak
+      const isRecentDay = i < 28;
+      data.push({
+        date: date,
+        active: isRecentDay ? true : isActive,
+        tasksCompleted: isActive ? Math.floor(Math.random() * 5) + 1 : 0
+      });
+    }
+    return data;
+  };
+  
+  const streakData = generateStreakData();
+  const currentStreak = 28; // Current streak
+  const longestStreak = 35; // Longest streak ever
+  const totalActiveDays = streakData.filter(d => d.active).length;
   
   // Interactive tasks state
   const [todaysTasks, setTodaysTasks] = useState<Task[]>([
@@ -228,7 +281,16 @@ export function Dashboard({ userData, onOpenWeeklyReview, onOpenChatForQuest, on
       weeks: []
     };
     setQuests(prev => [...prev, newQuest]);
+    setSelectedQuest(newQuest); // Auto-select the new quest
     startEditQuest(newQuest.id, newQuest.name);
+  };
+
+  const handleQuestComplete = (questId: string) => {
+    setQuests(prev =>
+      prev.map(q =>
+        q.id === questId ? { ...q, progress: 100, status: 'completed' } : q
+      )
+    );
   };
 
   const getQuestHealth = (quest: any) => {
@@ -263,8 +325,17 @@ export function Dashboard({ userData, onOpenWeeklyReview, onOpenChatForQuest, on
               onClick={onOpenWeeklyReview}
               className="gap-2"
             >
-              <Calendar className="w-4 h-4" />
-              Weekly Review
+              <Compass className="w-4 h-4" />
+              Quest Review
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={() => setShowProgressDialog(true)}
+              className="gap-2"
+            >
+              <TrendingUp className="w-4 h-4" />
+              View Progress
             </Button>
             
             {/* User Profile */}
@@ -426,18 +497,130 @@ export function Dashboard({ userData, onOpenWeeklyReview, onOpenChatForQuest, on
                 animate={{ opacity: 1, y: 0 }}
                 className="grid grid-cols-3 gap-2"
               >
-                <Card className="p-3 text-center bg-white/60 backdrop-blur-sm border-indigo-200/50">
-                  <div className="text-2xl text-indigo-600 mb-1">{quests.length}</div>
-                  <div className="text-xs text-slate-600">Quests</div>
+                <Card className="py-1.5 px-2 flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm border-indigo-200/50">
+                  <div className="text-xl text-indigo-600 leading-none">{quests.length}</div>
+                  <div className="text-[10px] text-slate-600 mt-0.5">Quests</div>
                 </Card>
-                <Card className="p-3 text-center bg-white/60 backdrop-blur-sm border-purple-200/50">
-                  <div className="text-2xl text-purple-600 mb-1">{avgProgress}%</div>
-                  <div className="text-xs text-slate-600">Avg</div>
+                <Card className="py-1.5 px-2 flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm border-purple-200/50">
+                  <div className="text-xl text-purple-600 leading-none">{avgProgress}%</div>
+                  <div className="text-[10px] text-slate-600 mt-0.5">Avg</div>
                 </Card>
-                <Card className="p-3 text-center bg-white/60 backdrop-blur-sm border-emerald-200/50">
-                  <div className="text-2xl text-emerald-600 mb-1">28</div>
-                  <div className="text-xs text-slate-600">Streak</div>
-                </Card>
+                
+                {/* Interactive Streak Card */}
+                <Popover open={showStreakPopover} onOpenChange={setShowStreakPopover}>
+                  <PopoverTrigger asChild>
+                    <motion.div
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="cursor-pointer"
+                    >
+                  <Card 
+                    className="py-1.5 px-2 text-center bg-gradient-to-br from-orange-50 to-red-50 border-orange-200/50 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
+                  >
+                    {/* Animated flame particles */}
+                    <motion.div
+                      className="absolute inset-0 pointer-events-none"
+                      initial={{ opacity: 0 }}
+                      whileHover={{ opacity: 1 }}
+                    >
+                      {[...Array(3)].map((_, i) => (
+                        <motion.div
+                          key={i}
+                          className="absolute bottom-0 left-1/2 w-1 h-1 bg-orange-400 rounded-full"
+                          style={{ left: `${30 + i * 20}%` }}
+                          animate={{
+                            y: [-10, -20],
+                            opacity: [0.7, 0],
+                            scale: [1, 0.5],
+                          }}
+                          transition={{
+                            duration: 1,
+                            repeat: Infinity,
+                            delay: i * 0.2,
+                          }}
+                        />
+                      ))}
+                    </motion.div>
+                    
+                    {/* Flame icon with pulse animation */}
+                    <div className="flex justify-center mb-0.5 relative z-10">
+                      <motion.div
+                        animate={{
+                          scale: [1, 1.1, 1],
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                        }}
+                      >
+                        <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500" />
+                      </motion.div>
+                    </div>
+                    
+                    <div className="text-xl text-orange-600 leading-none relative z-10">{currentStreak}</div>
+                    <div className="text-[10px] text-orange-700 relative z-10 mt-0.5">Day Streak</div>
+                  </Card>
+                    </motion.div>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-4 bg-white/95 backdrop-blur-sm border-orange-200" side="bottom" align="start">
+                    <div className="space-y-3">
+                      {/* Header */}
+                      <div className="flex items-center gap-2">
+                        <Flame className="w-5 h-5 text-orange-500 fill-orange-500" />
+                        <span className="font-medium text-slate-900">{currentStreak} day streak</span>
+                      </div>
+                      
+                      {/* Day labels */}
+                      <div className="flex justify-between text-xs text-slate-500">
+                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                          <div key={i} className="w-7 text-center">{day}</div>
+                        ))}
+                      </div>
+                      
+                      {/* 7-day streak boxes */}
+                      <div className="flex justify-between gap-1">
+                        {[...Array(7)].map((_, i) => {
+                          const isCompleted = i >= (7 - currentStreak);
+                          const isToday = i === 6;
+                          
+                          return (
+                            <motion.div
+                              key={i}
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                                isCompleted 
+                                  ? 'bg-orange-500 text-white' 
+                                  : 'bg-slate-100 border-2 border-slate-200'
+                              } ${isToday ? 'ring-2 ring-orange-400 ring-offset-2' : ''}`}
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              transition={{ delay: i * 0.05 }}
+                            >
+                              {isCompleted && (
+                                <CheckCircle2 className="w-4 h-4" />
+                              )}
+                            </motion.div>
+                          );
+                        })}
+                      </div>
+                      
+                      <Separator className="bg-orange-200/50" />
+                      
+                      {/* View Details button */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full bg-gradient-to-r from-orange-50 to-red-50 border-orange-200 hover:bg-orange-100 text-orange-700"
+                        onClick={() => {
+                          setShowStreakPopover(false);
+                          setShowStreakDetailsDialog(true);
+                        }}
+                      >
+                        <Calendar className="w-3.5 h-3.5 mr-2" />
+                        View Full Details
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </motion.div>
 
               {/* North Star - EDITABLE */}
@@ -544,12 +727,12 @@ export function Dashboard({ userData, onOpenWeeklyReview, onOpenChatForQuest, on
                 
                 <Reorder.Group 
                   axis="y" 
-                  values={quests} 
+                  values={quests.filter((q: any) => q.confirmed !== false)} 
                   onReorder={setQuests}
                   className="space-y-3"
                 >
                   <AnimatePresence>
-                    {quests.map((quest: any, index: number) => {
+                    {quests.filter((q: any) => q.confirmed !== false).map((quest: any, index: number) => {
                       const health = getQuestHealth(quest);
                       const HealthIcon = health.icon;
                       const isPaused = pausedQuests.has(quest.id);
@@ -617,6 +800,12 @@ export function Dashboard({ userData, onOpenWeeklyReview, onOpenChatForQuest, on
                                     ) : (
                                       <div className="flex items-center gap-2">
                                         <span className="font-medium truncate">{quest.name}</span>
+                                        {quest.status === 'completed' && (
+                                          <Badge variant="outline" className="text-xs px-1.5 py-0 h-5 bg-green-100 text-green-700 border-green-300 flex items-center gap-1">
+                                            <CheckCircle2 className="w-3 h-3" />
+                                            Complete
+                                          </Badge>
+                                        )}
                                         {isPaused && (
                                           <Badge variant="outline" className="text-xs px-1.5 py-0 h-5 bg-amber-100 text-amber-700 border-amber-300">
                                             Paused
@@ -806,30 +995,128 @@ export function Dashboard({ userData, onOpenWeeklyReview, onOpenChatForQuest, on
         <div className="flex-1 overflow-y-auto bg-white relative">
 
           <div className="p-8 space-y-6">
-            {/* Quest Header */}
-            <div className="pb-4 border-b">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-4xl">{selectedQuest.name}</h2>
-                <Badge className="bg-indigo-600 text-lg px-4 py-2">{selectedQuest.progress}%</Badge>
+            {selectedQuest ? (
+              <>
+                {/* Quest Header with Navigation */}
+                <div className="pb-4 border-b">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-4">
+                      {/* Quest Navigation */}
+                      <div className="inline-flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const currentIndex = quests.findIndex((q: any) => q.id === selectedQuest.id);
+                            if (currentIndex > 0) {
+                              setSelectedQuest(quests[currentIndex - 1]);
+                            }
+                          }}
+                          disabled={quests.findIndex((q: any) => q.id === selectedQuest.id) === 0}
+                          className="h-8 w-8 p-0 hover:bg-indigo-50 disabled:opacity-50"
+                          title="Previous Quest"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <div className="text-sm px-3 min-w-[60px] text-center">
+                          <span className="text-indigo-600">{quests.findIndex((q: any) => q.id === selectedQuest.id) + 1}</span>
+                          <span className="text-slate-400"> / </span>
+                          <span className="text-slate-600">{quests.length}</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const currentIndex = quests.findIndex((q: any) => q.id === selectedQuest.id);
+                            if (currentIndex < quests.length - 1) {
+                              setSelectedQuest(quests[currentIndex + 1]);
+                            }
+                          }}
+                          disabled={quests.findIndex((q: any) => q.id === selectedQuest.id) === quests.length - 1}
+                          className="h-8 w-8 p-0 hover:bg-indigo-50 disabled:opacity-50"
+                          title="Next Quest"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <Separator orientation="vertical" className="h-6" />
+                      <h2 className="text-4xl">{selectedQuest.name}</h2>
+                    </div>
+                    <Badge className="bg-indigo-600 text-lg px-4 py-2">{selectedQuest.progress}%</Badge>
+                  </div>
+                  <p className="text-slate-600 text-lg ml-[140px]">
+                    Milestone {selectedQuest.currentMilestone + 1} of {selectedQuest.milestones.length}: {selectedQuest.milestones[selectedQuest.currentMilestone]?.title || selectedQuest.milestones[selectedQuest.currentMilestone]}
+                  </p>
+                </div>
+
+                {/* Quest Map - Now Full Width */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl text-slate-700">Your Quest Journey</h3>
+                    
+                    {/* View Toggle */}
+                    <div className="inline-flex items-center bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
+                      <Button
+                        variant={mapView === 'tree' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setMapView('tree')}
+                        className={`gap-2 ${mapView === 'tree' ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'hover:bg-slate-100'}`}
+                      >
+                        <GitBranch className="w-4 h-4" />
+                        Tree View
+                      </Button>
+                      <Button
+                        variant={mapView === 'circle' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setMapView('circle')}
+                        className={`gap-2 ${mapView === 'circle' ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'hover:bg-slate-100'}`}
+                      >
+                        <CircleDot className="w-4 h-4" />
+                        Circle View
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Conditional Rendering based on mapView */}
+                  {mapView === 'tree' ? (
+                    <QuestMap 
+                      quest={selectedQuest} 
+                      onAskAI={onAskAIAboutTask} 
+                      onQuestComplete={handleQuestComplete}
+                      onConfirmQuest={(questId) => {
+                        // Mark quest as confirmed
+                        setQuests(prev => prev.map(q => 
+                          q.id === questId ? { ...q, confirmed: true } : q
+                        ));
+                        // Update parent state
+                        setUserData((prev: any) => ({
+                          ...prev,
+                          quests: prev.quests.map((q: any) => 
+                            q.id === questId ? { ...q, confirmed: true } : q
+                          )
+                        }));
+                        // Update selected quest to reflect confirmation
+                        setSelectedQuest((prev: any) => 
+                          prev && prev.id === questId ? { ...prev, confirmed: true } : prev
+                        );
+                      }}
+                      onRegenerateQuest={onRegenerateQuest}
+                    />
+                  ) : (
+                    <GoalScape quest={selectedQuest} />
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <Compass className="w-16 h-16 mx-auto mb-4 text-slate-300" />
+                  <h3 className="text-2xl text-slate-600 mb-2">No Quest Selected</h3>
+                  <p className="text-slate-400">Select a quest from the sidebar or create a new one</p>
+                </div>
               </div>
-              <p className="text-slate-600 text-lg">
-                Milestone {selectedQuest.currentMilestone + 1} of {selectedQuest.milestones.length}: {selectedQuest.milestones[selectedQuest.currentMilestone]}
-              </p>
-            </div>
+            )}
 
-            {/* Quest Map - Now Full Width */}
-            <div>
-              <h3 className="text-xl mb-4 text-slate-700">Your Quest Journey</h3>
-              <QuestMap quest={selectedQuest} onAskAI={onAskAIAboutTask} />
-            </div>
-
-            {/* Goal Progress */}
-            <div>
-              <h3 className="text-xl mb-4 text-slate-700">Progress Over Time</h3>
-              <Card className="p-6">
-                <GoalProgress quest={selectedQuest} />
-              </Card>
-            </div>
           </div>
         </div>
 
@@ -1055,25 +1342,6 @@ export function Dashboard({ userData, onOpenWeeklyReview, onOpenChatForQuest, on
 
             <Separator />
 
-            {/* Effort Streak */}
-            <div>
-              <h3 className="text-sm uppercase tracking-wide text-slate-500 mb-3">Effort Streak</h3>
-              <Card className="p-6 bg-gradient-to-br from-orange-50 to-red-50 border-orange-200 shadow-sm">
-                <div className="flex items-center gap-4 mb-3">
-                  <div className="flex items-center justify-center w-14 h-14 rounded-full bg-orange-100">
-                    <Flame className="w-7 h-7 text-orange-600" />
-                  </div>
-                  <div>
-                    <div className="text-4xl text-orange-900">28</div>
-                    <div className="text-sm text-orange-700">days strong</div>
-                  </div>
-                </div>
-                <p className="text-sm text-orange-700">
-                  Your longest streak yet! Keep going.
-                </p>
-              </Card>
-            </div>
-
             {/* Celebrations */}
             <div>
               <h3 className="text-sm uppercase tracking-wide text-slate-500 mb-3">Recent Achievements</h3>
@@ -1103,6 +1371,171 @@ export function Dashboard({ userData, onOpenWeeklyReview, onOpenChatForQuest, on
           </div>
         </div>
       </div>
+
+
+      {/* Streak Full Details Dialog */}
+      <Dialog open={showStreakDetailsDialog} onOpenChange={setShowStreakDetailsDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="sr-only">Your Streak Progress</DialogTitle>
+            <DialogDescription className="sr-only">
+              View your current streak and daily progress
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center py-4 px-2 max-h-[80vh] overflow-y-auto">
+            {/* Header with flame */}
+            <div className="flex items-center gap-3 mb-6">
+              <div className="relative">
+                <motion.div
+                  animate={{
+                    scale: [1, 1.05, 1],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                  }}
+                >
+                  <Flame className="w-12 h-12 text-orange-500 fill-orange-500" />
+                </motion.div>
+                <div className="absolute inset-0 blur-lg bg-orange-400/20 -z-10" />
+              </div>
+              <div className="text-left">
+                <h2 className="text-2xl text-slate-900">
+                  {currentStreak} day streak
+                </h2>
+                <p className="text-sm text-slate-600">
+                  {currentStreak > 0 
+                    ? "Keep the momentum going!" 
+                    : "Start your streak today!"}
+                </p>
+              </div>
+            </div>
+
+            {/* Calendar Section */}
+            <div className="w-full bg-white/70 backdrop-blur-xl rounded-2xl p-4 border border-indigo-100/50">
+              {/* Month Navigation */}
+              <div className="flex items-center justify-between mb-4">
+                <button
+                  onClick={() => {
+                    const newMonth = new Date(viewingMonth);
+                    newMonth.setMonth(newMonth.getMonth() - 1);
+                    setViewingMonth(newMonth);
+                  }}
+                  className="p-2 hover:bg-indigo-50 rounded-lg transition-all hover:scale-105"
+                >
+                  <ChevronLeft className="w-4 h-4 text-indigo-600" />
+                </button>
+                <h3 className="text-sm text-slate-900">
+                  {viewingMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </h3>
+                <button
+                  onClick={() => {
+                    const newMonth = new Date(viewingMonth);
+                    newMonth.setMonth(newMonth.getMonth() + 1);
+                    setViewingMonth(newMonth);
+                  }}
+                  className="p-2 hover:bg-indigo-50 rounded-lg transition-all hover:scale-105"
+                >
+                  <ChevronRight className="w-4 h-4 text-indigo-600" />
+                </button>
+              </div>
+
+              {/* Day headers */}
+              <div className="grid grid-cols-7 gap-2 mb-2">
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                  <div key={i} className="text-center text-slate-500 text-xs">
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar Grid */}
+              {(() => {
+                const firstDay = new Date(viewingMonth.getFullYear(), viewingMonth.getMonth(), 1);
+                const lastDay = new Date(viewingMonth.getFullYear(), viewingMonth.getMonth() + 1, 0);
+                const startingDayOfWeek = firstDay.getDay();
+                const daysInMonth = lastDay.getDate();
+                const paddingDays = Array(startingDayOfWeek).fill(null);
+                
+                const monthStreakData: { [key: number]: typeof streakData[0] } = {};
+                streakData.forEach(day => {
+                  if (day.date.getMonth() === viewingMonth.getMonth() && 
+                      day.date.getFullYear() === viewingMonth.getFullYear()) {
+                    monthStreakData[day.date.getDate()] = day;
+                  }
+                });
+                
+                const today = new Date();
+                
+                return (
+                  <div className="grid grid-cols-7 gap-2">
+                    {paddingDays.map((_, i) => (
+                      <div key={`padding-${i}`} className="aspect-square" />
+                    ))}
+                    
+                    {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(dayNum => {
+                      const dayData = monthStreakData[dayNum];
+                      const currentDate = new Date(viewingMonth.getFullYear(), viewingMonth.getMonth(), dayNum);
+                      const isToday = currentDate.toDateString() === today.toDateString();
+                      const isFuture = currentDate > today;
+                      const isActive = dayData?.active || false;
+                      
+                      return (
+                        <div key={dayNum} className="aspect-square flex items-center justify-center">
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs transition-all ${
+                              isActive 
+                                ? 'bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-md hover:scale-110' 
+                                : isToday 
+                                  ? 'bg-indigo-100 text-indigo-700 border-2 border-indigo-400 ring-2 ring-indigo-200' 
+                                  : 'text-slate-400 hover:bg-indigo-50'
+                            }`}
+                          >
+                            {dayNum}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Motivational message */}
+            {currentStreak >= 7 && (
+              <div className="mt-4 p-3 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 w-full">
+                <div className="flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-indigo-900">
+                    {currentStreak >= 30 ? "Incredible consistency! 🌟" :
+                     currentStreak >= 14 ? "You're on fire! Keep going! 🔥" :
+                     "Great momentum! Don't break the chain! 💪"}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Progress Details Dialog */}
+      <Dialog open={showProgressDialog} onOpenChange={setShowProgressDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3 text-2xl">
+              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500">
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+              Quest Progress
+            </DialogTitle>
+            <DialogDescription>
+              Track your journey and celebrate your achievements
+            </DialogDescription>
+          </DialogHeader>
+
+          <GoalProgress quest={selectedQuest} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
