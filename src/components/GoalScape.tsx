@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, ChevronLeft, ChevronRight, Home, MoreVertical } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -60,7 +61,7 @@ export function GoalScape({ quest }: GoalScapeProps) {
 
   const [currentGoalId, setCurrentGoalId] = useState('main');
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
-  const [hoveredGoal, setHoveredGoal] = useState<string | null>(null);
+  const [hoveredGoal, setHoveredGoal] = useState<Goal | null>(null);
   const [history, setHistory] = useState(['main']);
   const [historyIndex, setHistoryIndex] = useState(0);
 
@@ -209,187 +210,183 @@ export function GoalScape({ quest }: GoalScapeProps) {
 
     if (total !== 100 && parent.subgoals.length > 1) {
       const otherGoalIds = parent.subgoals.filter(gId => gId !== id);
-      const diff = 100 - total;
-      const eachAdjust = diff / otherGoalIds.length;
-      
-      otherGoalIds.forEach(gId => {
-        const current = updatedGoals[gId].importance;
+      const remaining = 100 - clamped;
+      const eachOther = Math.floor(remaining / otherGoalIds.length);
+      const remainder = remaining - (eachOther * otherGoalIds.length);
+
+      otherGoalIds.forEach((gId, i) => {
         updatedGoals[gId] = {
           ...updatedGoals[gId],
-          importance: Math.max(0, Math.round(current + eachAdjust))
+          importance: i === otherGoalIds.length - 1 ? eachOther + remainder : eachOther
         };
       });
     }
 
     setGoals(updatedGoals);
-    if (selectedGoal?.id === id) {
-      setSelectedGoal({ ...selectedGoal, importance: clamped });
+  };
+
+  const handleGoalClick = (goalId: string) => {
+    const goal = goals[goalId];
+    if (goal.subgoals && goal.subgoals.length > 0) {
+      // If goal has subgoals, drill down into it
+      navigateToGoal(goalId);
+    } else {
+      // If no subgoals, just select it for editing
+      setSelectedGoal(goal);
     }
   };
 
-  const renderCircle = () => {
-    const centerX = 400;
-    const centerY = 400;
-    const radius = 300;
+  const renderCircularChart = () => {
+    const cx = 250;
+    const cy = 250;
+    const baseInnerRadius = 80;
+    const ringWidth = 60;
 
-    return (
-      <svg width="800" height="800" className="mx-auto">
-        {/* Center circle for current goal */}
-        <g>
-          <circle
-            cx={centerX}
-            cy={centerY}
-            r={80}
-            fill={currentGoal.id === 'main' ? '#6366f1' : colors[0]}
-            opacity={0.9}
-            stroke="#fff"
-            strokeWidth="3"
-            className="cursor-pointer transition-all hover:opacity-100"
-            onClick={() => setSelectedGoal(currentGoal)}
-          />
-          <text
-            x={centerX}
-            y={centerY - 10}
-            textAnchor="middle"
-            fill="white"
-            className="pointer-events-none select-none"
-          >
+    if (!currentGoal.subgoals || currentGoal.subgoals.length === 0) {
+      return (
+        <svg width="500" height="500" className="mx-auto">
+          <circle cx={cx} cy={cy} r={baseInnerRadius} fill="#f8fafc" stroke="#e2e8f0" strokeWidth="2" />
+          <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" className="fill-slate-700 text-base font-semibold select-none">
             {currentGoal.name}
           </text>
-          <text
-            x={centerX}
-            y={centerY + 15}
-            textAnchor="middle"
-            fill="white"
-            fontSize="24"
-            className="pointer-events-none select-none"
-          >
-            {currentGoal.progress}%
+          <text x={cx} y={cy + 30} textAnchor="middle" dominantBaseline="middle" className="fill-slate-500 text-sm select-none">
+            No subgoals yet
           </text>
-        </g>
+        </svg>
+      );
+    }
 
-        {/* Subgoal circles */}
-        {currentGoal.subgoals.map((goalId, index) => {
-          const goal = goals[goalId];
-          if (!goal) return null;
+    const renderRing = (goalIds: string[], level: number, parentStartAngle: number, parentEndAngle: number) => {
+      const elements: JSX.Element[] = [];
+      const innerRadius = baseInnerRadius + (level * ringWidth);
+      const outerRadius = innerRadius + ringWidth;
+      
+      let currentAngle = parentStartAngle;
+      const totalAngle = parentEndAngle - parentStartAngle;
 
-          const angle = (index / currentGoal.subgoals.length) * 2 * Math.PI - Math.PI / 2;
-          const x = centerX + radius * Math.cos(angle);
-          const y = centerY + radius * Math.sin(angle);
-          const size = 40 + (goal.importance / 100) * 60;
+      goalIds.forEach((goalId, index) => {
+        const goal = goals[goalId];
+        if (!goal) return;
 
-          return (
-            <g key={goalId}>
-              {/* Connection line */}
-              <line
-                x1={centerX}
-                y1={centerY}
-                x2={x}
-                y2={y}
-                stroke={colors[index % colors.length]}
-                strokeWidth={Math.max(2, goal.importance / 10)}
-                opacity={0.3}
-              />
-              
-              {/* Subgoal circle */}
-              <circle
-                cx={x}
-                cy={y}
-                r={size}
-                fill={colors[index % colors.length]}
-                opacity={hoveredGoal === goalId ? 1 : 0.8}
-                stroke="#fff"
-                strokeWidth="2"
-                className="cursor-pointer transition-all"
-                onMouseEnter={() => setHoveredGoal(goalId)}
-                onMouseLeave={() => setHoveredGoal(null)}
-                onClick={() => {
-                  if (goal.subgoals.length > 0) {
-                    navigateToGoal(goalId);
-                  } else {
-                    setSelectedGoal(goal);
-                  }
-                }}
-                onDoubleClick={() => goal.subgoals.length > 0 && navigateToGoal(goalId)}
-              />
-              
-              {/* Goal name */}
-              <text
-                x={x}
-                y={y - 5}
-                textAnchor="middle"
-                fill="white"
-                fontSize="12"
-                className="pointer-events-none select-none"
-              >
-                {goal.name}
-              </text>
-              
-              {/* Progress */}
-              <text
-                x={x}
-                y={y + 10}
-                textAnchor="middle"
-                fill="white"
-                fontSize="14"
-                className="pointer-events-none select-none"
-              >
-                {goal.progress}%
-              </text>
+        const angle = (goal.importance / 100) * totalAngle;
+        const startAngle = currentAngle;
+        const endAngle = currentAngle + angle;
 
-              {/* Importance */}
-              <text
-                x={x}
-                y={y + 25}
-                textAnchor="middle"
-                fill="white"
-                fontSize="10"
-                opacity={0.7}
-                className="pointer-events-none select-none"
-              >
-                {goal.importance}%
-              </text>
-            </g>
-          );
-        })}
+        const x1 = cx + innerRadius * Math.cos(startAngle);
+        const y1 = cy + innerRadius * Math.sin(startAngle);
+        const x2 = cx + outerRadius * Math.cos(startAngle);
+        const y2 = cy + outerRadius * Math.sin(startAngle);
+        const x3 = cx + outerRadius * Math.cos(endAngle);
+        const y3 = cy + outerRadius * Math.sin(endAngle);
+        const x4 = cx + innerRadius * Math.cos(endAngle);
+        const y4 = cy + innerRadius * Math.sin(endAngle);
+
+        const largeArc = angle > Math.PI ? 1 : 0;
+
+        const pathData = [
+          `M ${x1} ${y1}`,
+          `L ${x2} ${y2}`,
+          `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${x3} ${y3}`,
+          `L ${x4} ${y4}`,
+          `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${x1} ${y1}`,
+          'Z'
+        ].join(' ');
+
+        const midAngle = startAngle + angle / 2;
+        const labelRadius = (innerRadius + outerRadius) / 2;
+        const labelX = cx + labelRadius * Math.cos(midAngle);
+        const labelY = cy + labelRadius * Math.sin(midAngle);
+
+        const isHovered = hoveredGoal?.id === goal.id;
+        const isSelected = selectedGoal?.id === goal.id;
+        const hasChildren = goal.subgoals && goal.subgoals.length > 0;
+
+        elements.push(
+          <g key={`${goal.id}-${level}`}>
+            <motion.path
+              d={pathData}
+              fill={colors[(level + index) % colors.length]}
+              opacity={isHovered || isSelected ? 1 : 0.85}
+              stroke="#475569"
+              strokeWidth="1"
+              className="cursor-pointer"
+              onMouseEnter={() => setHoveredGoal(goal)}
+              onMouseLeave={() => setHoveredGoal(null)}
+              onClick={() => handleGoalClick(goal.id)}
+              initial={false}
+              animate={{ d: pathData, opacity: isHovered || isSelected ? 1 : 0.85 }}
+              transition={{ 
+                d: { duration: 0.6, ease: "easeInOut" },
+                opacity: { duration: 0.2 }
+              }}
+            />
+            <motion.text
+              x={labelX}
+              y={labelY}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="fill-slate-800 text-xs font-medium pointer-events-none select-none"
+              transform={`rotate(${(midAngle * 180 / Math.PI) + 90}, ${labelX}, ${labelY})`}
+              initial={false}
+              animate={{ 
+                x: labelX, 
+                y: labelY,
+                transform: `rotate(${(midAngle * 180 / Math.PI) + 90}, ${labelX}, ${labelY})`
+              }}
+              transition={{ duration: 0.6, ease: "easeInOut" }}
+            >
+              {goal.name}
+            </motion.text>
+          </g>
+        );
+
+        // Recursively render children in the next ring
+        if (hasChildren && level < 2) {
+          elements.push(...renderRing(goal.subgoals, level + 1, startAngle, endAngle));
+        }
+
+        currentAngle = endAngle;
+      });
+
+      return elements;
+    };
+
+    return (
+      <svg width="500" height="500" className="mx-auto">
+        {renderRing(currentGoal.subgoals, 0, -Math.PI / 2, (3 * Math.PI) / 2)}
+
+        <circle cx={cx} cy={cy} r={baseInnerRadius} fill="#f8fafc" stroke="#e2e8f0" strokeWidth="2" />
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" className="fill-slate-700 text-base font-semibold select-none">
+          {currentGoal.name}
+        </text>
+        {currentGoal.id !== 'main' && (
+          <text x={cx} y={cy + 25} textAnchor="middle" dominantBaseline="middle" className="fill-slate-500 text-xs select-none">
+            Progress: {currentGoal.progress}%
+          </text>
+        )}
       </svg>
     );
   };
 
+  const getBreadcrumb = () => {
+    const path = [];
+    let current = currentGoalId;
+    while (current) {
+      path.unshift(goals[current]);
+      current = goals[current].parentId;
+    }
+    return path;
+  };
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6">
-      {/* Navigation Bar */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={navigateToHome}
-            disabled={currentGoalId === 'main'}
-          >
-            <Home className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={navigateBack}
-            disabled={historyIndex === 0}
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={navigateForward}
-            disabled={historyIndex === history.length - 1}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-          <span className="ml-4 text-slate-600">{currentGoal.name}</span>
+    <div className="space-y-6">
+      {/* Header with Add Button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-slate-500 text-sm">Visualize and prioritize your goals hierarchically</p>
         </div>
         <Button
           onClick={() => addSubgoal()}
-          size="sm"
           className="bg-indigo-600 hover:bg-indigo-700"
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -397,83 +394,216 @@ export function GoalScape({ quest }: GoalScapeProps) {
         </Button>
       </div>
 
-      {/* Main Circle View */}
-      <div className="mb-6">
-        {renderCircle()}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Chart Area */}
+        <div className="lg:col-span-2 bg-white rounded-2xl p-8 border border-slate-200 relative">
+          {/* Navigation Controls - Top Right */}
+          <div className="absolute top-4 right-4 flex gap-2 z-10">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={navigateBack}
+              disabled={historyIndex === 0}
+              className="w-10 h-10 p-0"
+              title="Go Back"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={navigateForward}
+              disabled={historyIndex === history.length - 1}
+              className="w-10 h-10 p-0"
+              title="Go Forward"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={navigateToHome}
+              className="w-10 h-10 p-0"
+              title="Go to Main Goal"
+            >
+              <Home className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-10 h-10 p-0"
+              title="More Options"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </Button>
+          </div>
+
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
+            {getBreadcrumb().map((goal, i) => (
+              <React.Fragment key={goal.id}>
+                {i > 0 && <span>/</span>}
+                <button
+                  onClick={() => navigateToGoal(goal.id)}
+                  className="hover:text-indigo-600 transition-colors"
+                >
+                  {goal.name}
+                </button>
+              </React.Fragment>
+            ))}
+          </div>
+
+          {renderCircularChart()}
+          
+          {currentGoal.id !== 'main' && currentGoal.subgoals.length === 0 && (
+            <div className="mt-4 text-center text-slate-500 text-sm">
+              Click "Add Subgoal" to create sub-tasks for {currentGoal.name}
+            </div>
+          )}
+          {currentGoal.subgoals.length > 0 && (
+            <div className="mt-4 text-center text-slate-500 text-sm">
+              Click on a segment to drill down into its subgoals
+            </div>
+          )}
+        </div>
+
+        {/* Sidebar Panel */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-200">
+          {selectedGoal ? (
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedGoal(null)}
+                  className="p-0"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => deleteSubgoal(selectedGoal.id)}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 p-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm text-slate-600 mb-2">Goal Name</label>
+                  <Input
+                    type="text"
+                    value={selectedGoal.name}
+                    onChange={(e) => updateGoal(selectedGoal.id, 'name', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-600 mb-2">
+                    Importance: {selectedGoal.importance}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={selectedGoal.importance}
+                    onChange={(e) => updateImportance(selectedGoal.id, e.target.value)}
+                    className="w-full accent-indigo-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-600 mb-2">
+                    Progress: {selectedGoal.progress}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={selectedGoal.progress}
+                    onChange={(e) => updateGoal(selectedGoal.id, 'progress', parseInt(e.target.value))}
+                    className="w-full accent-indigo-600"
+                  />
+                  <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
+                    <div
+                      className="bg-indigo-600 h-2 rounded-full transition-all"
+                      style={{ width: `${selectedGoal.progress}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-600 mb-2">Notes & Actions</label>
+                  <Textarea
+                    value={selectedGoal.notes}
+                    onChange={(e) => updateGoal(selectedGoal.id, 'notes', e.target.value)}
+                    placeholder="Add notes, action items, or details..."
+                    className="min-h-[150px] resize-none"
+                  />
+                </div>
+
+                <Button
+                  onClick={() => addSubgoal(selectedGoal.id)}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Subgoal to {selectedGoal.name}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full flex items-center justify-center text-slate-500">
+              <p className="text-center text-sm">
+                Click on a goal segment to view details<br />
+                or click to drill down if it has subgoals
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Selected Goal Details */}
-      {selectedGoal && (
-        <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="text-lg">Goal Details</h4>
-            {selectedGoal.id !== 'main' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => deleteSubgoal(selectedGoal.id)}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm mb-1">Name</label>
-              <Input
-                value={selectedGoal.name}
-                onChange={(e) => updateGoal(selectedGoal.id, 'name', e.target.value)}
-                disabled={selectedGoal.id === 'main'}
-              />
-            </div>
-            
-            {selectedGoal.id !== 'main' && (
-              <div>
-                <label className="block text-sm mb-1">Importance (%)</label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={selectedGoal.importance}
-                  onChange={(e) => updateImportance(selectedGoal.id, e.target.value)}
-                />
-              </div>
-            )}
-            
-            <div>
-              <label className="block text-sm mb-1">Progress (%)</label>
-              <Input
-                type="number"
-                min="0"
-                max="100"
-                value={selectedGoal.progress}
-                onChange={(e) => updateGoal(selectedGoal.id, 'progress', parseInt(e.target.value) || 0)}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm mb-1">Notes</label>
-              <Textarea
-                value={selectedGoal.notes}
-                onChange={(e) => updateGoal(selectedGoal.id, 'notes', e.target.value)}
-                rows={3}
-              />
-            </div>
-          </div>
+      {/* Current Level Details */}
+      <div className="bg-white rounded-2xl p-6 border border-slate-200">
+        <h2 className="text-lg text-slate-800 mb-4">Current Level: {currentGoal.name}</h2>
+        <div className="space-y-3">
+          {currentGoal.subgoals && currentGoal.subgoals.length > 0 ? (
+            currentGoal.subgoals.map((goalId, index) => {
+              const goal = goals[goalId];
+              if (!goal) return null;
+              return (
+                <div
+                  key={goal.id}
+                  onClick={() => setSelectedGoal(goal)}
+                  onDoubleClick={() => goal.subgoals?.length > 0 && navigateToGoal(goal.id)}
+                  className="bg-slate-50 rounded-lg p-4 cursor-pointer hover:bg-slate-100 transition-colors border border-slate-200"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-4 h-4 rounded-full"
+                        style={{ backgroundColor: colors[index % colors.length] }}
+                      />
+                      <span className="text-slate-800">{goal.name}</span>
+                      {goal.subgoals?.length > 0 && (
+                        <span className="text-xs text-slate-500">
+                          ({goal.subgoals.length} subgoals)
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-slate-500">
+                      <span>Importance: {goal.importance}%</span>
+                      <span>Progress: {goal.progress}%</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <p className="text-slate-500 text-center py-4 text-sm">No subgoals at this level</p>
+          )}
         </div>
-      )}
-
-      {/* Instructions */}
-      <div className="mt-4 p-3 bg-indigo-50 rounded-lg text-sm text-slate-600">
-        <p><strong>How to use:</strong></p>
-        <ul className="list-disc list-inside mt-2 space-y-1">
-          <li>Click on a circle to view/edit its details</li>
-          <li>Double-click a circle with subgoals to navigate into it</li>
-          <li>Circle size represents importance</li>
-          <li>Use navigation buttons to move between levels</li>
-        </ul>
       </div>
     </div>
   );

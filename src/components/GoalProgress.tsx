@@ -117,7 +117,7 @@ export function GoalProgress({ quest }: GoalProgressProps) {
             
             return (
               <div
-                key={milestone.id}
+                key={milestone.id || `milestone-${index}`}
                 className={`bg-white/80 backdrop-blur-sm rounded-xl p-4 border ${
                   isCompleted 
                     ? 'border-emerald-200' 
