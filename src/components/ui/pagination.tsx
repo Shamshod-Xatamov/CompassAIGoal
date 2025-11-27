@@ -1,9 +1,8 @@
 import * as React from "react";
 import {
-  ChevronLeftIcon,
   ChevronRightIcon,
   MoreHorizontalIcon,
-} from "lucide-react@0.487.0";
+} from "lucide-react";
 
 import { cn } from "./utils";
 import { Button, buttonVariants } from "./button";
@@ -65,23 +64,6 @@ function PaginationLink({
   );
 }
 
-function PaginationPrevious({
-  className,
-  ...props
-}: React.ComponentProps<typeof PaginationLink>) {
-  return (
-    <PaginationLink
-      aria-label="Go to previous page"
-      size="default"
-      className={cn("gap-1 px-2.5 sm:pl-2.5", className)}
-      {...props}
-    >
-      <ChevronLeftIcon />
-      <span className="hidden sm:block">Previous</span>
-    </PaginationLink>
-  );
-}
-
 function PaginationNext({
   className,
   ...props
@@ -121,7 +103,6 @@ export {
   PaginationContent,
   PaginationLink,
   PaginationItem,
-  PaginationPrevious,
   PaginationNext,
   PaginationEllipsis,
 };

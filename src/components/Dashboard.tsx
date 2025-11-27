@@ -40,6 +40,7 @@ import {
 import { QuestMap } from './QuestMap';
 import { GoalProgress } from './GoalProgress';
 import { GoalScape } from './GoalScape';
+import { CircleView } from './CircleView';
 import { 
   Target, Flame, Trophy, Calendar, 
   CheckCircle2, Circle, Edit2, Trash2, Plus, GripVertical, Check, XCircle,
@@ -305,10 +306,10 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
     : 0;
 
   return (
-    <div className="min-h-screen">
+    <div className="h-screen overflow-hidden">
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="px-8 py-4 flex items-center justify-between">
+        <div className="px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <motion.div
               animate={{ rotate: 360 }}
@@ -456,8 +457,9 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
       </header>
 
       {/* Three Column Layout */}
-      <div className="flex h-[calc(100vh-73px)]">
+      <div className="flex h-[calc(100vh-57px)]">
         {/* Left Column - The "Why" - COLLAPSIBLE SIDEBAR */}
+        {mapView !== 'circle' && (
         <motion.div
           initial={false}
           animate={{ 
@@ -490,7 +492,7 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
           </div>
 
           <div className="w-80 h-full overflow-y-auto">
-            <div className="p-6 space-y-6 relative z-10">
+            <div className="p-3 space-y-3 relative z-10">
               {/* Quick Stats Widget */}
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
@@ -975,8 +977,10 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
             </AlertDialog>
           </div>
         </motion.div>
+        )}
 
         {/* Sidebar Toggle Button - Positioned on the border */}
+        {mapView !== 'circle' && (
         <motion.button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           className="absolute top-8 z-30 p-1.5 rounded-lg bg-white border border-slate-200 shadow-md hover:shadow-lg hover:bg-indigo-50 hover:border-indigo-300 transition-all"
@@ -990,55 +994,19 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
             <ChevronLeft className="w-4 h-4 text-slate-600" />
           )}
         </motion.button>
+        )}
 
         {/* Center Column - The "What" */}
-        <div className="flex-1 overflow-y-auto bg-white relative">
+        <div className={`flex-1 overflow-y-auto ${mapView === 'circle' ? '' : 'bg-white'} relative`}>
 
-          <div className="p-8 space-y-6">
+          <div className={mapView === 'circle' ? 'h-full' : 'p-4 space-y-4'}>
             {selectedQuest ? (
               <>
                 {/* Quest Header with Navigation */}
+                {mapView !== 'circle' && (
                 <div className="pb-4 border-b">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-4">
-                      {/* Quest Navigation */}
-                      <div className="inline-flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const currentIndex = quests.findIndex((q: any) => q.id === selectedQuest.id);
-                            if (currentIndex > 0) {
-                              setSelectedQuest(quests[currentIndex - 1]);
-                            }
-                          }}
-                          disabled={quests.findIndex((q: any) => q.id === selectedQuest.id) === 0}
-                          className="h-8 w-8 p-0 hover:bg-indigo-50 disabled:opacity-50"
-                          title="Previous Quest"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </Button>
-                        <div className="text-sm px-3 min-w-[60px] text-center">
-                          <span className="text-indigo-600">{quests.findIndex((q: any) => q.id === selectedQuest.id) + 1}</span>
-                          <span className="text-slate-400"> / </span>
-                          <span className="text-slate-600">{quests.length}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const currentIndex = quests.findIndex((q: any) => q.id === selectedQuest.id);
-                            if (currentIndex < quests.length - 1) {
-                              setSelectedQuest(quests[currentIndex + 1]);
-                            }
-                          }}
-                          disabled={quests.findIndex((q: any) => q.id === selectedQuest.id) === quests.length - 1}
-                          className="h-8 w-8 p-0 hover:bg-indigo-50 disabled:opacity-50"
-                          title="Next Quest"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </Button>
-                      </div>
                       <Separator orientation="vertical" className="h-6" />
                       <h2 className="text-4xl">{selectedQuest.name}</h2>
                     </div>
@@ -1048,34 +1016,45 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
                     Milestone {selectedQuest.currentMilestone + 1} of {selectedQuest.milestones.length}: {selectedQuest.milestones[selectedQuest.currentMilestone]?.title || selectedQuest.milestones[selectedQuest.currentMilestone]}
                   </p>
                 </div>
+                )}
 
                 {/* Quest Map - Now Full Width */}
-                <div>
+                <div className={mapView === 'circle' ? 'h-full' : ''}>
+                  {mapView !== 'circle' && (
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-xl text-slate-700">Your Quest Journey</h3>
                     
                     {/* View Toggle */}
-                    <div className="inline-flex items-center bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
+                    <div className="inline-flex items-center bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-xl p-1.5 shadow-lg shadow-slate-200/50 gap-1">
                       <Button
                         variant={mapView === 'tree' ? 'default' : 'ghost'}
                         size="sm"
                         onClick={() => setMapView('tree')}
-                        className={`gap-2 ${mapView === 'tree' ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'hover:bg-slate-100'}`}
+                        className={`gap-2.5 rounded-lg px-4 py-2.5 font-medium transition-all duration-300 ${
+                          mapView === 'tree' 
+                            ? 'bg-gradient-to-br from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-600/30 scale-105' 
+                            : 'hover:bg-indigo-50/80 text-slate-600 hover:text-indigo-600 hover:scale-105'
+                        }`}
                       >
-                        <GitBranch className="w-4 h-4" />
-                        Tree View
+                        <GitBranch className="w-4 h-4 transition-transform duration-300" />
+                        <span className="text-sm">Tree View</span>
                       </Button>
                       <Button
                         variant={mapView === 'circle' ? 'default' : 'ghost'}
                         size="sm"
                         onClick={() => setMapView('circle')}
-                        className={`gap-2 ${mapView === 'circle' ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'hover:bg-slate-100'}`}
+                        className={`gap-2.5 rounded-lg px-4 py-2.5 font-medium transition-all duration-300 ${
+                          mapView === 'circle' 
+                            ? 'bg-gradient-to-br from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-lg shadow-indigo-600/30 scale-105' 
+                            : 'hover:bg-indigo-50/80 text-slate-600 hover:text-indigo-600 hover:scale-105'
+                        }`}
                       >
-                        <CircleDot className="w-4 h-4" />
-                        Circle View
+                        <CircleDot className="w-4 h-4 transition-transform duration-300" />
+                        <span className="text-sm">Circle View</span>
                       </Button>
                     </div>
                   </div>
+                  )}
 
                   {/* Conditional Rendering based on mapView */}
                   {mapView === 'tree' ? (
@@ -1103,7 +1082,15 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
                       onRegenerateQuest={onRegenerateQuest}
                     />
                   ) : (
-                    <GoalScape quest={selectedQuest} />
+                    <CircleView 
+                      onBack={() => setMapView('tree')}
+                      onAskAI={(goalText, goalNotes) => {
+                        if (onAskAIAboutTask) {
+                          const context = goalNotes ? `${goalText}: ${goalNotes}` : goalText;
+                          onAskAIAboutTask(context, selectedQuest?.name || 'Goal', 'Planning');
+                        }
+                      }}
+                    />
                   )}
                 </div>
               </>
@@ -1121,8 +1108,9 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
         </div>
 
         {/* Right Column - The "How" - NOW INTERACTIVE! */}
+        {mapView !== 'circle' && (
         <div className="w-96 border-l bg-gradient-to-b from-white to-slate-50 overflow-y-auto">
-          <div className="p-6 space-y-6">
+          <div className="p-3 space-y-3">
             {/* Today's Focus - FULLY INTERACTIVE */}
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -1370,6 +1358,7 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
             </div>
           </div>
         </div>
+        )}
       </div>
 
 

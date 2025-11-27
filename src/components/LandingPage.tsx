@@ -89,7 +89,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 text-slate-900 overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 text-slate-900 overflow-y-auto">
       {/* Animated Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 left-10 w-72 h-72 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
@@ -98,7 +98,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="relative z-10 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto">
+      <nav className="relative z-10 flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-2 text-2xl">
           <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
             <Compass className="w-6 h-6 text-white" />
@@ -111,8 +111,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative z-10 max-w-7xl mx-auto px-8 py-20 grid md:grid-cols-2 gap-12 items-center">
-        <div className="space-y-8 md:pl-12">
+      <section className="relative z-10 px-6 py-12 grid md:grid-cols-2 gap-8 items-center max-w-screen-2xl mx-auto">
+        <div className="space-y-8 md:pl-6">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-100/80 backdrop-blur-sm rounded-full border border-indigo-200/50">
             <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
             <span className="text-sm text-slate-700">Find Your True Direction</span>
@@ -240,7 +240,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
       </section>
 
       {/* Features Section */}
-      <section className="relative z-10 max-w-7xl mx-auto px-8 py-20">
+      <section className="relative z-10 px-6 py-12 max-w-screen-2xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-4xl mb-4">Powerful Tools for Your Journey</h2>
           <p className="text-xl text-slate-600">Everything you need to discover and achieve your goals</p>
@@ -263,7 +263,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
       </section>
 
       {/* Stats Section */}
-      <section className="relative z-10 max-w-7xl mx-auto px-8 py-20">
+      <section className="relative z-10 px-6 py-12 max-w-screen-2xl mx-auto">
         <div className="bg-gradient-to-r from-indigo-100/80 to-purple-100/80 backdrop-blur-sm rounded-3xl p-12 border border-indigo-200/50 shadow-xl">
           <div className="grid md:grid-cols-3 gap-12 text-center">
             <div>
@@ -292,7 +292,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
       </section>
 
       {/* Testimonials Section */}
-      <section className="relative z-10 max-w-7xl mx-auto px-8 py-20">
+      <section className="relative z-10 px-6 py-12 max-w-screen-2xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-4xl mb-4">Loved by Goal-Seekers Worldwide</h2>
           <p className="text-xl text-slate-600">Real stories from people who found their North Star</p>
@@ -320,7 +320,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
       </section>
 
       {/* CTA Section */}
-      <section className="relative z-10 max-w-4xl mx-auto px-8 py-20">
+      <section className="relative z-10 px-6 py-12 max-w-screen-2xl mx-auto">
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl p-12 text-center shadow-2xl text-white">
           <h2 className="text-4xl mb-6">Ready to Find Your North Star?</h2>
           <p className="text-xl mb-8 opacity-90">Join thousands of people discovering what truly matters to them</p>
@@ -336,7 +336,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 max-w-7xl mx-auto px-8 py-12 border-t border-indigo-200/50 mt-20">
+      <footer className="relative z-10 px-6 py-8 border-t border-indigo-200/50 max-w-screen-2xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2 text-xl">
             <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-md">

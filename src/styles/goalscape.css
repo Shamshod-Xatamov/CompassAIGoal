@@ -1,0 +1,361 @@
+/* GoalScape Styles */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background-color: #f4f7f9;
+  color: #333;
+}
+
+.goalscape-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.goalscape-header {
+  color: #1a3b5d;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.goalscape-subtitle {
+  text-align: center;
+  color: #666;
+  margin-bottom: 30px;
+}
+
+.goalscape-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.goalscape-panel {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.goalscape-panel h2 {
+  color: #1a3b5d;
+  text-align: left;
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+.goalscape-nav-controls {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+}
+
+.goalscape-nav-button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ddd;
+  background-color: white;
+  color: #666;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.goalscape-nav-button:hover:not(:disabled) {
+  background-color: #f0f0f0;
+  color: #007bff;
+}
+
+.goalscape-nav-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.goalscape-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.goalscape-breadcrumb button {
+  background: none;
+  border: none;
+  color: #007bff;
+  padding: 0;
+  cursor: pointer;
+  font-size: 14px;
+  width: auto;
+  display: inline;
+}
+
+.goalscape-breadcrumb button:hover {
+  color: #0056b3;
+  text-decoration: underline;
+}
+
+.goalscape-breadcrumb span {
+  color: #999;
+}
+
+.goalscape-chart-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 500px;
+}
+
+.goalscape-hint {
+  margin-top: 20px;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+}
+
+.goalscape-sidebar {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.goalscape-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.goalscape-sidebar-button {
+  width: auto;
+  padding: 8px;
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.goalscape-sidebar-button:hover {
+  color: #007bff;
+  background-color: #f0f0f0;
+}
+
+.goalscape-sidebar-button.delete {
+  color: #dc3545;
+}
+
+.goalscape-sidebar-button.delete:hover {
+  color: #c82333;
+  background-color: #fff5f5;
+}
+
+.goalscape-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.goalscape-form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.goalscape-form-group label {
+  margin-bottom: 8px;
+  color: #666;
+  font-size: 14px;
+}
+
+.goalscape-form-group input[type="text"],
+.goalscape-form-group textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+}
+
+.goalscape-form-group input[type="range"] {
+  width: 100%;
+  accent-color: #007bff;
+}
+
+.goalscape-progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.goalscape-progress-fill {
+  height: 100%;
+  background-color: #007bff;
+  transition: width 0.3s ease;
+}
+
+.goalscape-button {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  background-color: #007bff;
+  color: white;
+  font-size: 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.goalscape-button:hover {
+  background-color: #0056b3;
+}
+
+.goalscape-empty-state {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+  padding: 40px 20px;
+}
+
+.goalscape-list-panel {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.goalscape-list-panel h2 {
+  color: #1a3b5d;
+  text-align: left;
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.goalscape-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.goalscape-list-item {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.goalscape-list-item:hover {
+  background-color: #e9ecef;
+  border-color: #dee2e6;
+}
+
+.goalscape-list-item-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.goalscape-list-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.goalscape-list-item-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+.goalscape-list-item-name {
+  color: #333;
+  font-weight: 500;
+}
+
+.goalscape-list-item-subgoals {
+  font-size: 12px;
+  color: #666;
+  margin-left: 8px;
+}
+
+.goalscape-list-item-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 14px;
+  color: #666;
+}
+
+.goalscape-empty-list {
+  color: #666;
+  text-align: center;
+  padding: 32px 16px;
+  font-size: 14px;
+}
+
+/* Custom slider styling for dark theme */
+input[type="range"].slider-indigo::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #6366f1;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.5);
+}
+
+input[type="range"].slider-indigo::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #6366f1;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.5);
+}
+
+input[type="range"].slider-green::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #10b981;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.5);
+}
+
+input[type="range"].slider-green::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #10b981;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.5);
+}

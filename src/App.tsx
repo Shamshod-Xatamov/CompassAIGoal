@@ -74,7 +74,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <>
       {currentScreen === 'landing' ? (
         <LandingPage onGetStarted={() => setCurrentScreen('onboarding')} />
       ) : currentScreen === 'onboarding' ? (
@@ -117,6 +117,6 @@ export default function App() {
           />
         </>
       )}
-    </div>
+    </>
   );
 }
