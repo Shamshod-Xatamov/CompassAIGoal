@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, Reorder, AnimatePresence } from 'motion/react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
@@ -55,6 +55,8 @@ interface Task {
   quest: string;
   completed: boolean;
   priority: 'high' | 'medium' | 'low';
+  milestone?: number; // Which milestone this task belongs to (0-indexed)
+  weight?: number; // How much this task contributes to progress (1-5, default 1)
 }
 
 interface DashboardProps {
@@ -127,29 +129,152 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
   const [todaysTasks, setTodaysTasks] = useState<Task[]>([
     { 
       id: '1', 
-      text: 'Design landing page mockup', 
+      text: 'Define MVP features and scope', 
       quest: 'Launch Side Project',
       completed: false,
-      priority: 'high'
+      priority: 'high',
+      milestone: 0, // Define MVP milestone
+      weight: 3 // Important foundational task
     },
     { 
       id: '2', 
-      text: 'Practice C major scale', 
-      quest: 'Learn Guitar',
+      text: 'Research competitor products', 
+      quest: 'Launch Side Project',
       completed: false,
-      priority: 'medium'
+      priority: 'medium',
+      milestone: 0,
+      weight: 2
     },
     { 
       id: '3', 
+      text: 'Create user personas', 
+      quest: 'Launch Side Project',
+      completed: false,
+      priority: 'medium',
+      milestone: 0,
+      weight: 2
+    },
+    { 
+      id: '4', 
+      text: 'Design landing page mockup', 
+      quest: 'Launch Side Project',
+      completed: false,
+      priority: 'high',
+      milestone: 1, // Build Core Features milestone
+      weight: 3
+    },
+    { 
+      id: '5', 
+      text: 'Set up development environment', 
+      quest: 'Launch Side Project',
+      completed: false,
+      priority: 'high',
+      milestone: 1,
+      weight: 2
+    },
+    { 
+      id: '6', 
+      text: 'Build authentication system', 
+      quest: 'Launch Side Project',
+      completed: false,
+      priority: 'high',
+      milestone: 1,
+      weight: 4
+    },
+    { 
+      id: '7', 
+      text: 'Implement core feature #1', 
+      quest: 'Launch Side Project',
+      completed: false,
+      priority: 'high',
+      milestone: 1,
+      weight: 5 // Critical task
+    },
+    { 
+      id: '8', 
+      text: 'Practice C major scale', 
+      quest: 'Learn Guitar',
+      completed: false,
+      priority: 'medium',
+      milestone: 0,
+      weight: 1
+    },
+    { 
+      id: '9', 
       text: '30-min morning workout', 
       quest: 'Health & Fitness',
       completed: true,
-      priority: 'medium'
+      priority: 'medium',
+      milestone: 0,
+      weight: 1
     },
   ]);
 
   const [editingTask, setEditingTask] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+
+  // Smart progress calculation based on milestones, task weights, and overall quest structure
+  const recalculateQuestProgress = (tasks: Task[], quest: any) => {
+    if (!quest) return 0;
+    
+    const questTasks = tasks.filter(t => t.quest === quest.name);
+    if (questTasks.length === 0) return 0;
+    
+    const totalMilestones = quest.milestones?.length || 1;
+    const progressPerMilestone = 100 / totalMilestones;
+    
+    // Calculate progress for each milestone
+    let totalProgress = 0;
+    
+    for (let milestoneIndex = 0; milestoneIndex < totalMilestones; milestoneIndex++) {
+      const milestoneTasks = questTasks.filter(t => t.milestone === milestoneIndex);
+      
+      if (milestoneTasks.length === 0) continue;
+      
+      // Calculate weighted progress for this milestone
+      const totalWeight = milestoneTasks.reduce((sum, task) => sum + (task.weight || 1), 0);
+      const completedWeight = milestoneTasks
+        .filter(t => t.completed)
+        .reduce((sum, task) => sum + (task.weight || 1), 0);
+      
+      // Progress within this milestone (0-100% of the milestone's portion)
+      const milestoneProgress = totalWeight > 0 ? (completedWeight / totalWeight) : 0;
+      
+      // Add this milestone's contribution to total progress
+      totalProgress += milestoneProgress * progressPerMilestone;
+    }
+    
+    return Math.round(totalProgress);
+  };
+
+  // Synchronize quest progress with task completion on mount and when tasks change
+  useEffect(() => {
+    // Update all quests with calculated progress based on current tasks
+    const updatedQuests = quests.map(quest => {
+      const newProgress = recalculateQuestProgress(todaysTasks, quest);
+      // Only update if progress has actually changed to avoid unnecessary re-renders
+      if (quest.progress !== newProgress) {
+        return { ...quest, progress: newProgress };
+      }
+      return quest;
+    });
+    
+    // Check if any quest was actually updated
+    const hasChanges = updatedQuests.some((quest, index) => quest.progress !== quests[index].progress);
+    
+    if (hasChanges) {
+      setQuests(updatedQuests);
+      
+      // Also update selectedQuest if it exists and was modified
+      if (selectedQuest) {
+        const updatedSelectedQuest = updatedQuests.find(q => q.id === selectedQuest.id);
+        if (updatedSelectedQuest && updatedSelectedQuest.progress !== selectedQuest.progress) {
+          setSelectedQuest(updatedSelectedQuest);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todaysTasks]); // Only re-run when todaysTasks changes
 
   // Task management functions
   const toggleTaskComplete = (taskId: string) => {
@@ -182,12 +307,17 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
   };
 
   const addNewTask = () => {
+    // Assign task to current milestone of the selected quest
+    const currentMilestone = selectedQuest.currentMilestone || 0;
+    
     const newTask: Task = {
       id: Date.now().toString(),
       text: 'New task',
       quest: selectedQuest.name,
       completed: false,
-      priority: 'medium'
+      priority: 'medium',
+      milestone: currentMilestone,
+      weight: 1 // Default weight
     };
     setTodaysTasks(prev => [...prev, newTask]);
     startEditTask(newTask.id, newTask.text);
@@ -330,14 +460,7 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
               Quest Review
             </Button>
             
-            <Button 
-              variant="outline" 
-              onClick={() => setShowProgressDialog(true)}
-              className="gap-2"
-            >
-              <TrendingUp className="w-4 h-4" />
-              View Progress
-            </Button>
+
             
             {/* User Profile */}
             <DropdownMenu>
@@ -911,15 +1034,29 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
                                 </div>
 
                                 {/* Progress bar */}
-                                <Progress 
-                                  value={quest.progress} 
-                                  className={`h-2 ${selectedQuest.id === quest.id ? 'bg-indigo-400' : ''}`}
-                                />
+                                <motion.div
+                                  key={`progress-bar-${quest.id}-${quest.progress}`}
+                                  initial={{ scale: 1 }}
+                                  animate={{ scale: [1, 1.02, 1] }}
+                                  transition={{ duration: 0.5 }}
+                                >
+                                  <Progress 
+                                    value={quest.progress} 
+                                    className={`h-2 ${selectedQuest.id === quest.id ? 'bg-indigo-400' : ''}`}
+                                  />
+                                </motion.div>
                                 
                                 <div className={`text-xs mt-2 flex items-center justify-between ${
                                   selectedQuest.id === quest.id ? 'text-indigo-200' : 'text-slate-500'
                                 }`}>
-                                  <span>{quest.progress}% complete</span>
+                                  <motion.span
+                                    key={`progress-${quest.id}-${quest.progress}`}
+                                    initial={{ opacity: 0, y: -5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                  >
+                                    {quest.progress}% complete
+                                  </motion.span>
                                   {quest.progress === 100 && (
                                     <motion.span
                                       initial={{ scale: 0 }}
@@ -1012,9 +1149,12 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
                     </div>
                     <Badge className="bg-indigo-600 text-lg px-4 py-2">{selectedQuest.progress}%</Badge>
                   </div>
-                  <p className="text-slate-600 text-lg ml-[140px]">
-                    Milestone {selectedQuest.currentMilestone + 1} of {selectedQuest.milestones.length}: {selectedQuest.milestones[selectedQuest.currentMilestone]?.title || selectedQuest.milestones[selectedQuest.currentMilestone]}
-                  </p>
+                  <div className="flex items-center gap-4">
+                    <Separator orientation="vertical" className="h-6 opacity-0" />
+                    <p className="text-slate-600 text-lg">
+                      Milestone {selectedQuest.currentMilestone + 1} of {selectedQuest.milestones.length}: {selectedQuest.milestones[selectedQuest.currentMilestone]?.title || selectedQuest.milestones[selectedQuest.currentMilestone]}
+                    </p>
+                  </div>
                 </div>
                 )}
 
@@ -1136,32 +1276,57 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
               </div>
               
               <Card className="p-5 shadow-sm">
-                {/* Ask AI about Today's Tasks button */}
-                <div className="mb-4 flex items-center justify-end">
-                  <motion.button
-                    onClick={() => {
-                      if (onAskAIAboutTask) {
-                        const taskList = todaysTasks.map(t => `${t.text} (${t.quest})`).join(', ');
-                        onAskAIAboutTask(taskList, 'Today\'s Tasks', new Date().toLocaleDateString('en-US', { weekday: 'long' }));
-                      }
-                    }}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs rounded-md bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    Ask AI about Today's Tasks
-                  </motion.button>
-                </div>
+                {/* Filter tasks for current milestone */}
+                {(() => {
+                  const currentMilestoneTasks = todaysTasks.filter(
+                    t => t.quest === selectedQuest.name && 
+                    t.milestone === selectedQuest.currentMilestone
+                  );
+                  const completedMilestoneCount = currentMilestoneTasks.filter(t => t.completed).length;
+                  
+                  return (
+                    <>
+                      {/* Ask AI about Current Milestone Tasks button */}
+                      <div className="mb-4 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <GitBranch className="w-4 h-4 text-indigo-600" />
+                          <span className="text-sm text-slate-700">
+                            {selectedQuest.milestones[selectedQuest.currentMilestone]}
+                          </span>
+                          <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-600 border-indigo-200">
+                            {completedMilestoneCount}/{currentMilestoneTasks.length} tasks
+                          </Badge>
+                        </div>
+                        <motion.button
+                          onClick={() => {
+                            if (onAskAIAboutTask) {
+                              const taskList = currentMilestoneTasks.map(t => `${t.text} (${t.quest})`).join(', ');
+                              onAskAIAboutTask(taskList, selectedQuest.milestones[selectedQuest.currentMilestone], new Date().toLocaleDateString('en-US', { weekday: 'long' }));
+                            }
+                          }}
+                          className="flex items-center gap-2 px-3 py-1.5 text-xs rounded-md bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          Ask AI
+                        </motion.button>
+                      </div>
 
-                <Reorder.Group 
-                  axis="y" 
-                  values={todaysTasks} 
-                  onReorder={setTodaysTasks}
-                  className="space-y-3"
-                >
-                  <AnimatePresence>
-                    {todaysTasks.map((task) => (
+                      <Reorder.Group 
+                        axis="y" 
+                        values={currentMilestoneTasks} 
+                        onReorder={(newOrder) => {
+                          // Update the order of current milestone tasks in the main tasks array
+                          const otherTasks = todaysTasks.filter(
+                            t => !(t.quest === selectedQuest.name && t.milestone === selectedQuest.currentMilestone)
+                          );
+                          setTodaysTasks([...otherTasks, ...newOrder]);
+                        }}
+                        className="space-y-3"
+                      >
+                        <AnimatePresence>
+                          {currentMilestoneTasks.map((task) => (
                       <Reorder.Item 
                         key={task.id} 
                         value={task}
@@ -1254,7 +1419,22 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
                                     </Badge>
                                   </motion.button>
                                 </div>
-                                <p className="text-xs text-slate-500">{task.quest}</p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                   <p className="text-xs text-slate-500">{task.quest}</p>
+                                   {task.milestone !== undefined && (() => {
+                                     const quest = quests.find(q => q.name === task.quest);
+                                     if (quest && quest.milestones && quest.milestones[task.milestone]) {
+                                       return (
+                                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-indigo-50/50 text-indigo-600 border-indigo-200">
+                                           <GitBranch className="w-2.5 h-2.5 mr-1" />
+                                           {quest.milestones[task.milestone]}
+                                         </Badge>
+                                       );
+                                     }
+                                     return null;
+                                   })()}
+
+                                 </div>
                               </>
                             )}
                           </div>
@@ -1295,36 +1475,39 @@ export function Dashboard({ userData, setUserData, onOpenWeeklyReview, onOpenCha
                         </motion.div>
                       </Reorder.Item>
                     ))}
-                  </AnimatePresence>
-                </Reorder.Group>
+                          </AnimatePresence>
+                        </Reorder.Group>
 
-                {/* Add new task button */}
-                <motion.button
-                  onClick={addNewTask}
-                  className="w-full mt-4 px-3 py-2.5 border-2 border-dashed border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 rounded-lg text-sm text-slate-500 hover:text-indigo-600 transition-all flex items-center justify-center gap-2"
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                >
-                  <Plus className="w-4 h-4" />
-                  Add new task
-                </motion.button>
+                        {/* Add new task button */}
+                        <motion.button
+                          onClick={addNewTask}
+                          className="w-full mt-4 px-3 py-2.5 border-2 border-dashed border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 rounded-lg text-sm text-slate-500 hover:text-indigo-600 transition-all flex items-center justify-center gap-2"
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add new task
+                        </motion.button>
 
-                {/* All done celebration */}
-                <AnimatePresence>
-                  {completedCount === todaysTasks.length && todaysTasks.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10, height: 0 }}
-                      animate={{ opacity: 1, y: 0, height: 'auto' }}
-                      exit={{ opacity: 0, y: 10, height: 0 }}
-                      className="mt-4 p-3 rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200"
-                    >
-                      <p className="text-sm text-emerald-800 font-medium flex items-center gap-2">
-                        <Trophy className="w-4 h-4" />
-                        All tasks complete! Amazing work! 🎉
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                        {/* Milestone completion celebration */}
+                        <AnimatePresence>
+                          {completedMilestoneCount === currentMilestoneTasks.length && currentMilestoneTasks.length > 0 && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10, height: 0 }}
+                              animate={{ opacity: 1, y: 0, height: 'auto' }}
+                              exit={{ opacity: 0, y: 10, height: 0 }}
+                              className="mt-4 p-3 rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200"
+                            >
+                              <p className="text-sm text-emerald-800 font-medium flex items-center gap-2">
+                                <Trophy className="w-4 h-4" />
+                                Milestone complete! Amazing work! 🎉
+                              </p>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </>
+                    );
+                  })()}
               </Card>
             </div>
 

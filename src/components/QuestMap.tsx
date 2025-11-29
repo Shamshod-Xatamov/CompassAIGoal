@@ -226,9 +226,10 @@ export function QuestMap({ quest, onAskAI, onQuestComplete, onConfirmQuest, onRe
         const updatedTasks = m.tasks.map(task =>
           task.id === taskId ? { ...task, completed: !task.completed } : task
         );
-        const allTasksComplete = updatedTasks.every(t => t.completed);
         const allSubGoalsComplete = m.subGoals.every(sg => sg.completed);
-        const allComplete = allTasksComplete && allSubGoalsComplete;
+        // Milestone is complete when all subgoals are complete
+        // (milestone overview tasks are optional and don't block progress)
+        const allComplete = allSubGoalsComplete;
         return { ...m, tasks: updatedTasks, completed: allComplete };
       }
       return m;
@@ -258,10 +259,10 @@ export function QuestMap({ quest, onAskAI, onQuestComplete, onConfirmQuest, onRe
           return sg;
         });
         
-        // Update milestone completion based on all subgoals AND milestone tasks
+        // Update milestone completion based on all subgoals only
+        // (milestone overview tasks are optional and don't block progress)
         const allSubGoalsComplete = updatedSubGoals.every(sg => sg.completed);
-        const allTasksComplete = m.tasks.every(t => t.completed);
-        const allComplete = allSubGoalsComplete && allTasksComplete;
+        const allComplete = allSubGoalsComplete;
         
         return { ...m, subGoals: updatedSubGoals, completed: allComplete };
       }
@@ -347,10 +348,10 @@ export function QuestMap({ quest, onAskAI, onQuestComplete, onConfirmQuest, onRe
             return sg;
           });
           
-          // Update milestone completion based on all subgoals AND milestone tasks
+          // Update milestone completion based on all subgoals only
+          // (milestone overview tasks are optional and don't block progress)
           const allSubGoalsComplete = updatedSubGoals.every(sg => sg.completed);
-          const allTasksComplete = m.tasks.every(t => t.completed);
-          const allComplete = allSubGoalsComplete && allTasksComplete;
+          const allComplete = allSubGoalsComplete;
           
           return { ...m, subGoals: updatedSubGoals, completed: allComplete };
         }
@@ -394,17 +395,28 @@ export function QuestMap({ quest, onAskAI, onQuestComplete, onConfirmQuest, onRe
     };
     
     if (isSubGoal && selectedSubGoal) {
-      setMilestones(prev => prev.map(m =>
-        m.id === selectedSubGoal.milestoneId ? {
-          ...m,
-          subGoals: m.subGoals.map(sg =>
+      setMilestones(prev => prev.map(m => {
+        if (m.id === selectedSubGoal.milestoneId) {
+          const updatedSubGoals = m.subGoals.map(sg =>
             sg.id === selectedSubGoal.subGoalId ? {
               ...sg,
-              tasks: [...sg.tasks, newTask]
+              tasks: [...sg.tasks, newTask],
+              completed: false // Adding incomplete task makes subgoal incomplete
             } : sg
-          )
-        } : m
-      ));
+          );
+          // Recalculate milestone completion
+          const allSubGoalsComplete = updatedSubGoals.every(sg => sg.completed);
+          return { ...m, subGoals: updatedSubGoals, completed: allSubGoalsComplete };
+        }
+        return m;
+      }).map((m, index, array) => {
+        // Recalculate isCurrent for each milestone
+        const firstIncompleteIndex = array.findIndex(milestone => !milestone.completed && milestone.status !== 'skipped');
+        return {
+          ...m,
+          isCurrent: index === firstIncompleteIndex && firstIncompleteIndex !== -1
+        };
+      }));
     } else {
       setMilestones(prev => prev.map(m =>
         m.id === parentId ? {
@@ -502,9 +514,9 @@ export function QuestMap({ quest, onAskAI, onQuestComplete, onConfirmQuest, onRe
       if (m.id === milestoneId) {
         const updatedSubGoals = [...m.subGoals, newSubGoal];
         // Recalculate milestone completion - adding incomplete subgoal makes milestone incomplete
+        // (milestone overview tasks are optional and don't block progress)
         const allSubGoalsComplete = updatedSubGoals.every(sg => sg.completed);
-        const allTasksComplete = m.tasks.every(t => t.completed);
-        const allComplete = allSubGoalsComplete && allTasksComplete;
+        const allComplete = allSubGoalsComplete;
         return { ...m, subGoals: updatedSubGoals, completed: allComplete };
       }
       return m;
@@ -561,10 +573,10 @@ export function QuestMap({ quest, onAskAI, onQuestComplete, onConfirmQuest, onRe
     setMilestones(prev => prev.map(m => {
       if (m.id === milestoneId) {
         const updatedSubGoals = m.subGoals.filter(sg => sg.id !== subGoalId);
-        // Update milestone completion based on remaining subgoals AND milestone tasks
+        // Update milestone completion based on remaining subgoals only
+        // (milestone overview tasks are optional and don't block progress)
         const allSubGoalsComplete = updatedSubGoals.every(sg => sg.completed);
-        const allTasksComplete = m.tasks.every(t => t.completed);
-        const allComplete = allSubGoalsComplete && allTasksComplete;
+        const allComplete = allSubGoalsComplete;
         return { ...m, subGoals: updatedSubGoals, completed: allComplete };
       }
       return m;
